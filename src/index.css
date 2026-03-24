@@ -98,6 +98,22 @@
   }
 }
 
+/* Safe area support for iOS */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Prevent text size adjustment on mobile */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Better tap targets */
+a, button {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Custom scrollbar for the dark theme */
 ::-webkit-scrollbar {
   width: 6px;

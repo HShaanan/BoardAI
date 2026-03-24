@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, ArrowLeft, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AgentAvatar from "../components/shared/AgentAvatar";
 import ChatAgentList from "../components/chat/ChatAgentList";
@@ -124,43 +124,73 @@ RULES:
     setSending(false);
   };
 
+  const [showAgentList, setShowAgentList] = useState(!selectedAgent);
+
+  const handleSelectAgentMobile = async (agent) => {
+    await handleSelectAgent(agent);
+    setShowAgentList(false);
+  };
+
   return (
-    <div className="flex h-screen">
-      {/* Agent List */}
-      <ChatAgentList
-        agents={agents}
-        selectedAgent={selectedAgent}
-        onSelect={handleSelectAgent}
-      />
+    <div className="flex h-[calc(100dvh-56px)] md:h-screen overflow-hidden">
+      {/* Agent List — full screen on mobile when visible */}
+      <div className={`
+        absolute inset-0 z-20 md:static md:z-auto md:block
+        transition-transform duration-300
+        ${showAgentList ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        w-full md:w-64 bg-sidebar flex flex-col
+      `}>
+        <div className="flex items-center gap-3 px-4 py-4 border-b border-sidebar-border">
+          <span className="font-semibold text-foreground">Select Agent</span>
+        </div>
+        <ChatAgentList
+          agents={agents}
+          selectedAgent={selectedAgent}
+          onSelect={handleSelectAgentMobile}
+        />
+      </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {!selectedAgent ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
+            <div className="text-center px-6">
+              <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-lg font-semibold text-foreground">Select an Agent</p>
               <p className="text-sm text-muted-foreground mt-1">Choose who you'd like to speak with</p>
+              <button
+                onClick={() => setShowAgentList(true)}
+                className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium md:hidden"
+              >
+                Browse Agents
+              </button>
             </div>
           </div>
         ) : (
           <>
             {/* Header */}
-            <div className="h-16 border-b border-border flex items-center gap-3 px-6 bg-card/50">
+            <div className="h-14 border-b border-border flex items-center gap-3 px-4 bg-card/50 shrink-0">
+              <button
+                onClick={() => setShowAgentList(true)}
+                className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-secondary"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
               <AgentAvatar agent={selectedAgent} size="sm" showStatus />
-              <div>
-                <p className="text-sm font-semibold text-foreground">{selectedAgent.title}</p>
-                <p className="text-xs text-muted-foreground">{selectedAgent.title_he}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{selectedAgent.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{selectedAgent.title_he}</p>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {messages.length === 0 && (
-                <div className="text-center py-12">
+                <div className="text-center py-10">
                   <AgentAvatar agent={selectedAgent} size="xl" />
                   <p className="text-foreground font-semibold mt-4">{selectedAgent.title}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{selectedAgent.responsibilities}</p>
-                  <p className="text-xs text-muted-foreground mt-4">Start a conversation with your {selectedAgent.title}...</p>
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{selectedAgent.responsibilities}</p>
+                  <p className="text-xs text-muted-foreground mt-4">Start a conversation...</p>
                 </div>
               )}
               {messages.map(msg => (
@@ -176,18 +206,22 @@ RULES:
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-border bg-card/50">
-              <div className="flex gap-3">
+            <div className="p-3 border-t border-border bg-card/50 shrink-0">
+              <div className="flex gap-2">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                   placeholder="Issue a board directive..."
-                  className="flex-1 bg-background border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   disabled={sending}
                 />
-                <Button onClick={handleSend} disabled={sending || !input.trim()} className="gap-2">
+                <Button
+                  onClick={handleSend}
+                  disabled={sending || !input.trim()}
+                  className="rounded-xl h-auto px-4"
+                >
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
