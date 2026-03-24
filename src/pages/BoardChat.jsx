@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import DecisionPanel from "../components/boardchat/DecisionPanel";
 import { base44 } from "@/api/base44Client";
 import { Send, Loader2, Users, Gavel, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,7 @@ export default function BoardChat() {
   const [conversation, setConversation] = useState(null);
   const [core, setCore] = useState(null);
   const [currentSpeaker, setCurrentSpeaker] = useState(null);
+  const [decisions, setDecisions] = useState([]);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -212,12 +214,56 @@ ${recentMsgs}
       });
     }
 
-    // Facilitator closing
-    await addMessage(conversation, {
-      role: "agent",
-      content: "הדיון בנושא זה הסתיים. כל הסוכנים הרלוונטיים הביעו את עמדתם.",
-      agent_role_key: "facilitator"
+    // Facilitator extracts decisions
+    setCurrentSpeaker("מנחה מסכם החלטות...");
+    const agentNames = agents.map(a => `${a.role_key}: ${a.title}`).join("\n");
+    const discussionSummary = selected.map(p => {
+      const a = agents.find(x => x.role_key === p.role_key);
+      return a?.title || p.role_key;
+    }).join(", ");
+
+    const decisionsResult = await base44.integrations.Core.InvokeLLM({
+      prompt: `סיכמת ישיבת דירקטוריון בנושא: "${topic}"
+השתתפו: ${discussionSummary}
+
+זהה החלטות ברורות שהתקבלו בדיון ושניתן להפוך לתוצאות (deliverables). לכל החלטה: מה לעשות, מי הסוכן האחראי, ועדיפות.
+
+החזר JSON בלבד:
+{
+  "decisions": [
+    {
+      "directive_text": "תיאור ברור של הפעולה הנדרשת",
+      "agent_role_key": "אחד מהמפתחות: ${agents.map(a => a.role_key).join(', ')}",
+      "priority": "low|medium|high|critical"
+    }
+  ]
+}`,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          decisions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                directive_text: { type: "string" },
+                agent_role_key: { type: "string" },
+                priority: { type: "string" }
+              }
+            }
+          }
+        }
+      }
     });
+
+    const extracted = decisionsResult?.decisions || [];
+    if (extracted.length > 0) {
+      setDecisions(prev => [...prev, ...extracted]);
+      const closingMsg = `הדיון הסתיים. זיהיתי ${extracted.length} החלטות לביצוע — ניתן להמיר אותן ל-Directives בלחיצה.`;
+      await addMessage(conversation, { role: "agent", content: closingMsg, agent_role_key: "facilitator" });
+    } else {
+      await addMessage(conversation, { role: "agent", content: "הדיון בנושא זה הסתיים. כל הסוכנים הרלוונטיים הביעו את עמדתם.", agent_role_key: "facilitator" });
+    }
 
     setCurrentSpeaker(null);
     setLoading(false);
@@ -311,6 +357,12 @@ ${recentMsgs}
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      <DecisionPanel
+        decisions={decisions}
+        agents={agents}
+        onDirectiveCreated={() => {}}
+      />
 
       {/* Input */}
       <div className="p-3 border-t border-border bg-card/50 shrink-0">
