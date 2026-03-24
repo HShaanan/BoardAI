@@ -5,7 +5,19 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
-// Add page imports here
+import AppShell from './components/AppShell';
+import AppLayout from './components/layout/AppLayout';
+import Dashboard from './pages/Dashboard';
+import OrgChart from './pages/OrgChart';
+import AgentProfile from './pages/AgentProfile';
+import Chat from './pages/Chat';
+import Directives from './pages/Directives';
+import Projects from './pages/Projects';
+import Brain from './pages/Brain';
+import Core from './pages/Core';
+import Outputs from './pages/Outputs';
+import Memory from './pages/Memory';
+import SettingsPage from './pages/SettingsPage';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -32,10 +44,24 @@ const AuthenticatedApp = () => {
 
   // Render the main app
   return (
-    <Routes>
-      {/* Add your page Route elements here */}
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <AppShell>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/org-chart" element={<OrgChart />} />
+          <Route path="/agent/:id" element={<AgentProfile />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/directives" element={<Directives />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/brain" element={<Brain />} />
+          <Route path="/core" element={<Core />} />
+          <Route path="/outputs" element={<Outputs />} />
+          <Route path="/memory" element={<Memory />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </AppShell>
   );
 };
 
