@@ -1,16 +1,16 @@
 import { Link, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, Network, MessageSquare, FolderKanban,
-  Brain, Heart, Zap, Archive, BookOpen, Settings
+  LayoutDashboard, MessageSquare, FolderKanban,
+  Brain, Zap, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PRIMARY_NAV = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/chat", icon: MessageSquare, label: "Chat" },
+  { path: "/board-chat", icon: Sparkles, label: "Board Room" },
   { path: "/directives", icon: Zap, label: "Directives" },
   { path: "/projects", icon: FolderKanban, label: "Projects" },
-  { path: "/brain", icon: Brain, label: "Brain" },
 ];
 
 export default function BottomNav() {
