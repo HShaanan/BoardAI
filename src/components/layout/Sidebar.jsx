@@ -4,6 +4,7 @@ import {
   FolderKanban, Archive, BookOpen, Settings, Zap, ChevronLeft, ChevronRight, Sparkles
 } from "lucide-react";
 import { useState } from "react";
+import NotificationBell from "../notifications/NotificationBell";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -65,6 +66,11 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Notifications */}
+      <div className="px-2 pb-2">
+        <NotificationBell collapsed={collapsed} />
+      </div>
 
       {/* Collapse toggle */}
       <button
