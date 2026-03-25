@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import AgentAvatar from "../components/shared/AgentAvatar";
 import DecisionPanel from "../components/boardchat/DecisionPanel";
 import ReactMarkdown from "react-markdown";
+import FeedbackButtons from "../components/shared/FeedbackButtons";
 
 // ── Message Bubble ──────────────────────────────────────
 function MessageBubble({ message, agentMap }) {

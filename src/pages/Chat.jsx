@@ -4,6 +4,7 @@ import { Loader2, ArrowUp, Search, PanelLeftClose, PanelLeftOpen, X, AtSign, Dow
 import AgentAvatar from "../components/shared/AgentAvatar";
 import ReactMarkdown from "react-markdown";
 import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
+import FeedbackButtons from "../components/shared/FeedbackButtons";
 
 // ── Message Bubble ──────────────────────────────────────
 function MessageBubble({ message, agentMap }) {
