@@ -7,14 +7,19 @@ import { Slider } from "@/components/ui/slider";
 import PageHeader from "../components/shared/PageHeader";
 import AgentAvatar from "../components/shared/AgentAvatar";
 import StatusBadge from "../components/shared/StatusBadge";
+import AgentGoalsPanel from "../components/agent/AgentGoalsPanel";
+import AgentAIPanel from "../components/agent/AgentAIPanel";
 
 export default function AgentProfile() {
-  const urlParams = new URLSearchParams(window.location.search);
   const agentId = window.location.pathname.split("/agent/")[1];
   const [agent, setAgent] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [outputs, setOutputs] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const loadTasks = () =>
+    base44.entities.Task.filter({ assigned_agent_id: agentId }).then(setTasks);
 
   useEffect(() => {
     if (!agentId) return;
@@ -22,10 +27,12 @@ export default function AgentProfile() {
       base44.entities.Agent.filter({ id: agentId }),
       base44.entities.Task.filter({ assigned_agent_id: agentId }),
       base44.entities.Output.filter({ agent_id: agentId }),
-    ]).then(([a, t, o]) => {
+      base44.entities.Project.list(),
+    ]).then(([a, t, o, p]) => {
       setAgent(a[0]);
       setTasks(t);
       setOutputs(o);
+      setProjects(p);
       setLoading(false);
     });
   }, [agentId]);
@@ -101,7 +108,7 @@ export default function AgentProfile() {
           </div>
         </div>
 
-        {/* Tasks */}
+        {/* Current Tasks */}
         <div className="bg-card rounded-xl border border-border p-6">
           <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
             <Briefcase className="w-4 h-4 text-primary" /> Current Tasks ({tasks.length})
@@ -119,6 +126,18 @@ export default function AgentProfile() {
             </div>
           )}
         </div>
+
+        {/* Goals & KPIs */}
+        <AgentGoalsPanel agent={agent} onUpdate={setAgent} />
+
+        {/* AI Capabilities */}
+        <AgentAIPanel
+          agent={agent}
+          tasks={tasks}
+          outputs={outputs}
+          projects={projects}
+          onTasksCreated={loadTasks}
+        />
 
         {/* Tools */}
         <div className="bg-card rounded-xl border border-border p-6">
