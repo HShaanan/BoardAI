@@ -42,7 +42,7 @@ function MessageBubble({ message, agentMap }) {
   }
 
   return (
-    <div className="flex gap-3 items-start mb-6">
+    <div className="flex gap-3 items-start mb-6 group">
       {agent ? (
         <AgentAvatar agent={agent} size="sm" showStatus />
       ) : (
@@ -58,6 +58,11 @@ function MessageBubble({ message, agentMap }) {
         <div className="prose prose-sm prose-invert max-w-none text-foreground/90 leading-relaxed">
           <ReactMarkdown>{message.content}</ReactMarkdown>
         </div>
+        <FeedbackButtons
+          message={message}
+          agentRoleKey={message.agent_role_key}
+          agentTitle={agent?.title}
+        />
       </div>
     </div>
   );
