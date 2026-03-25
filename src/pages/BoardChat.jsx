@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Send, Loader2, Sparkles, Users, Check, X, MessageSquarePlus, ChevronDown, ChevronUp, Download, FileText, PanelLeftOpen } from "lucide-react";
+import { Send, Loader2, Sparkles, Users, ChevronDown, ChevronUp, Download, FileText, Plus, ArrowUp } from "lucide-react";
 import MeetingSidebar from "../components/boardchat/MeetingSidebar";
 import ExportOutputModal from "../components/boardchat/ExportOutputModal";
 import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
@@ -9,13 +9,6 @@ import AgentAvatar from "../components/shared/AgentAvatar";
 import DecisionPanel from "../components/boardchat/DecisionPanel";
 import ReactMarkdown from "react-markdown";
 
-// ── Phases ──────────────────────────────────────────────
-// "idle"       → waiting for topic
-// "planning"   → facilitator analyzing, recommending agents
-// "confirming" → user reviews & confirms participants + format
-// "running"    → discussion in progress (user can interrupt)
-// "done"       → discussion ended, decisions shown
-
 function MessageBubble({ message, agents }) {
   const isBoard = message.role === "board";
   const isFacilitator = message.agent_role_key === "facilitator";
@@ -23,12 +16,9 @@ function MessageBubble({ message, agents }) {
 
   if (isBoard) {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[75%]">
-          <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-1 text-right">הדירקטוריון</p>
+      <div className="flex justify-end mb-6">
+        <div className="max-w-[70%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-3">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
         </div>
       </div>
     );
@@ -36,16 +26,14 @@ function MessageBubble({ message, agents }) {
 
   if (isFacilitator) {
     return (
-      <div className="flex gap-3 items-start">
-        <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+      <div className="flex gap-3 items-start mb-6">
+        <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center shrink-0 mt-0.5">
           <Sparkles className="w-4 h-4 text-accent" />
         </div>
-        <div className="max-w-[80%]">
-          <p className="text-[11px] font-semibold text-accent mb-1">מנחה הישיבה</p>
-          <div className="bg-accent/10 border border-accent/30 rounded-2xl rounded-tl-md px-4 py-3">
-            <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-              {message.content}
-            </ReactMarkdown>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-accent mb-1.5">מנחה הישיבה</p>
+          <div className="prose prose-sm prose-invert max-w-none text-foreground/90 leading-relaxed">
+            <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
         </div>
       </div>
@@ -53,29 +41,29 @@ function MessageBubble({ message, agents }) {
   }
 
   return (
-    <div className="flex gap-3 items-start">
+    <div className="flex gap-3 items-start mb-6">
       {agent ? (
         <AgentAvatar agent={agent} size="sm" showStatus />
       ) : (
-        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0 mt-0.5">
           <Users className="w-4 h-4 text-muted-foreground" />
         </div>
       )}
-      <div className="max-w-[78%]">
-        <p className="text-[11px] font-semibold text-muted-foreground mb-1">
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-muted-foreground mb-1.5">
           {agent?.title || message.agent_role_key}
+          {agent?.title_he && agent.title_he !== agent.title && (
+            <span className="font-normal opacity-60"> · {agent.title_he}</span>
+          )}
         </p>
-        <div className="bg-card border border-border rounded-2xl rounded-tl-md px-4 py-3">
-          <ReactMarkdown className="text-sm prose prose-sm prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-            {message.content}
-          </ReactMarkdown>
+        <div className="prose prose-sm prose-invert max-w-none text-foreground/90 leading-relaxed">
+          <ReactMarkdown>{message.content}</ReactMarkdown>
         </div>
       </div>
     </div>
   );
 }
 
-// ── ConfirmPanel ────────────────────────────────────────
 function ConfirmPanel({ recommendation, allAgents, onConfirm }) {
   const [selectedKeys, setSelectedKeys] = useState(
     () => recommendation.selected_agents.map(s => s.role_key)
@@ -91,89 +79,86 @@ function ConfirmPanel({ recommendation, allAgents, onConfirm }) {
   const selectedAgents = allAgents.filter(a => selectedKeys.includes(a.role_key));
 
   return (
-    <div className="mx-4 mb-3 bg-card border border-primary/40 rounded-2xl overflow-hidden max-h-[60vh] flex flex-col">
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-primary/5 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-primary">אישור משתתפים ופורמט</span>
-        </div>
-        {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-      </button>
-
-      {expanded && (
-        <div className="px-4 pb-4 space-y-4 overflow-y-auto flex-1">
-          {/* Agent chips */}
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">בחר/בטל משתתפים:</p>
-            <div className="flex flex-wrap gap-2">
-              {allAgents.filter(a => a.is_active).map(a => {
-                const rec = recommendation.selected_agents.find(s => s.role_key === a.role_key);
-                const isSelected = selectedKeys.includes(a.role_key);
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => toggleAgent(a.role_key)}
-                    title={rec?.reason || ""}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-all ${
-                      isSelected
-                        ? "bg-primary/20 border-primary text-primary"
-                        : "bg-secondary/50 border-border text-muted-foreground hover:border-primary/40"
-                    }`}
-                  >
-                    <span>{a.avatar_emoji}</span>
-                    <span>{a.title_he || a.title}</span>
-                    {isSelected && rec && (
-                      <span className="text-[9px] opacity-70">★ מומלץ</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+    <div className="max-w-2xl mx-auto w-full px-4 mb-4">
+      <div className="bg-card border border-primary/30 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-primary/5 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold text-primary">אישור משתתפים ופורמט</span>
           </div>
+          {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+        </button>
 
-          {/* Format */}
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">פורמט הדיון:</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setFormat("statements")}
-                className={`p-3 rounded-xl border text-left transition-all ${
-                  format === "statements" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
-                }`}
-              >
-                <p className="text-xs font-semibold text-foreground">הבעת עמדות</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">כל סוכן מביע עמדה עצמאית</p>
-              </button>
-              <button
-                onClick={() => setFormat("debate")}
-                className={`p-3 rounded-xl border text-left transition-all ${
-                  format === "debate" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
-                }`}
-              >
-                <p className="text-xs font-semibold text-foreground">דיון פתוח</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">סוכנים מגיבים אחד לשני</p>
-              </button>
+        {expanded && (
+          <div className="px-4 pb-4 space-y-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">בחר/בטל משתתפים:</p>
+              <div className="flex flex-wrap gap-2">
+                {allAgents.filter(a => a.is_active).map(a => {
+                  const rec = recommendation.selected_agents.find(s => s.role_key === a.role_key);
+                  const isSelected = selectedKeys.includes(a.role_key);
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() => toggleAgent(a.role_key)}
+                      title={rec?.reason || ""}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-all ${
+                        isSelected
+                          ? "bg-primary/20 border-primary text-primary"
+                          : "bg-secondary/50 border-border text-muted-foreground hover:border-primary/40"
+                      }`}
+                    >
+                      <span>{a.avatar_emoji}</span>
+                      <span>{a.title_he || a.title}</span>
+                      {isSelected && rec && <span className="text-[9px] opacity-70">★</span>}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          <Button
-            onClick={() => onConfirm(selectedAgents, format)}
-            disabled={selectedAgents.length === 0}
-            className="w-full rounded-xl"
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            פתח את הדיון ({selectedAgents.length} משתתפים)
-          </Button>
-        </div>
-      )}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">פורמט הדיון:</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setFormat("statements")}
+                  className={`p-3 rounded-xl border text-right transition-all ${
+                    format === "statements" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <p className="text-xs font-semibold text-foreground">הבעת עמדות</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">כל סוכן מביע עמדה עצמאית</p>
+                </button>
+                <button
+                  onClick={() => setFormat("debate")}
+                  className={`p-3 rounded-xl border text-right transition-all ${
+                    format === "debate" ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <p className="text-xs font-semibold text-foreground">דיון פתוח</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">סוכנים מגיבים אחד לשני</p>
+                </button>
+              </div>
+            </div>
+
+            <Button
+              onClick={() => onConfirm(selectedAgents, format)}
+              disabled={selectedAgents.length === 0}
+              className="w-full rounded-xl"
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              פתח את הדיון ({selectedAgents.length} משתתפים)
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// ── Main Page ───────────────────────────────────────────
 export default function BoardChat() {
   const [agents, setAgents] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -193,6 +178,7 @@ export default function BoardChat() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [meetings, setMeetings] = useState([]);
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const loadMeetings = async () => {
     const all = await base44.entities.Conversation.filter({ type: "meeting" });
@@ -204,29 +190,22 @@ export default function BoardChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, phase]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px";
+    }
+  }, [input]);
+
   const init = async () => {
-    const [a, c, convos] = await Promise.all([
+    const [a, c] = await Promise.all([
       base44.entities.Agent.list(),
       base44.entities.CompanyCore.list("-created_date", 1),
-      base44.entities.Conversation.filter({ type: "meeting", topic: "board_room_discussion" }),
     ]);
     const active = a.filter(ag => ag.is_active);
     setAgents(active);
     if (c.length > 0) setCore(c[0]);
-
-    let convo;
-    if (convos.length > 0) {
-      convo = convos[0];
-    } else {
-      convo = await base44.entities.Conversation.create({
-        type: "meeting",
-        topic: "board_room_discussion",
-        participants: active.map(ag => ag.id),
-      });
-    }
-    setConversation(convo);
-    const msgs = await base44.entities.ChatMessage.filter({ conversation_id: convo.id });
-    setMessages(msgs.sort((a, b) => new Date(a.created_date) - new Date(b.created_date)));
     await loadMeetings();
     setInitializing(false);
   };
@@ -245,7 +224,19 @@ export default function BoardChat() {
     setPendingTopic(topic);
     setPhase("planning");
 
-    await addMsg(conversation, { role: "board", content: topic });
+    // If no conversation yet, create one
+    let convo = conversation;
+    if (!convo) {
+      convo = await base44.entities.Conversation.create({
+        type: "meeting",
+        topic: "board_room_discussion",
+        participants: agents.map(ag => ag.id),
+      });
+      setConversation(convo);
+      await loadMeetings();
+    }
+
+    await addMsg(convo, { role: "board", content: topic });
 
     const agentsList = agents.map(a =>
       `- ${a.role_key}: ${a.title} (${a.department}) — ${a.responsibilities}`
@@ -265,7 +256,7 @@ export default function BoardChat() {
       }
     });
 
-    await addMsg(conversation, {
+    await addMsg(convo, {
       role: "agent",
       content: `${rec.facilitator_message}\n\n**פורמט מומלץ:** ${rec.suggested_format === "debate" ? "דיון פתוח" : "הבעת עמדות"} — ${rec.format_reason}`,
       agent_role_key: "facilitator"
@@ -389,14 +380,8 @@ export default function BoardChat() {
     setActiveAgents([]);
     setDecisions([]);
     setMessages([]);
-    const newConvo = await base44.entities.Conversation.create({
-      type: "meeting",
-      topic: "board_room_discussion",
-      participants: agents.map(ag => ag.id),
-    });
-    setConversation(newConvo);
+    setConversation(null);
     await loadMeetings();
-    setSidebarOpen(false);
   };
 
   const handleEndMeeting = async () => {
@@ -417,12 +402,18 @@ export default function BoardChat() {
     setDecisions([]);
     setActiveAgents([]);
     setPendingTopic(meeting.topic !== "board_room_discussion" ? meeting.topic : "");
-    setSidebarOpen(false);
   };
 
   const handleSend = () => {
     if (phase === "idle" || phase === "done") handleTopicSubmit();
     else if (phase === "running") handleInterject();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   if (initializing) {
@@ -436,8 +427,11 @@ export default function BoardChat() {
     );
   }
 
+  const isEmptyState = !conversation || (messages.length === 0 && phase === "idle");
+
   return (
-    <div className="flex h-[calc(100dvh-56px)] md:h-screen overflow-hidden">
+    <div className="flex h-[calc(100dvh-56px)] md:h-screen overflow-hidden bg-background">
+      {/* Sidebar */}
       <MeetingSidebar
         meetings={meetings}
         currentId={conversation?.id}
@@ -448,38 +442,81 @@ export default function BoardChat() {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(o => !o)}
       />
-      <div className="flex flex-col flex-1 min-w-0">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-border bg-card/50 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-accent" />
+
+      {/* Main area */}
+      <div className="flex flex-col flex-1 min-w-0 relative">
+
+        {/* Empty / welcome state */}
+        {isEmptyState ? (
+          <div className="flex flex-col flex-1 items-center justify-center px-4">
+            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center mb-6">
+              <Sparkles className="w-8 h-8 text-accent" />
             </div>
-            <div>
-              <h1 className="text-sm font-bold text-foreground">Board Room</h1>
-              <p className="text-xs text-muted-foreground">
-                {phase === "idle" && "ממתין לנושא"}
-                {phase === "planning" && "המנחה מנתח..."}
-                {phase === "confirming" && `${recommendation?.selected_agents?.length || 0} משתתפים מומלצים`}
-                {phase === "running" && `${activeAgents.length} משתתפים · ${discussionFormat === "debate" ? "דיון פתוח" : "הבעת עמדות"}`}
-                {phase === "done" && `הסתיים · ${decisions.length} החלטות`}
-              </p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Board Room</h2>
+            <p className="text-muted-foreground text-sm text-center max-w-md mb-8">
+              הציגו נושא — המנחה יתאם ציפיות, ימליץ על משתתפים ופורמט, ואתם תאשרו לפני תחילת הדיון
+            </p>
+            <div className="grid grid-cols-1 gap-2 w-full max-w-sm mb-8">
+              {["מה האסטרטגיה שלנו לרבעון הבא?", "איך נגדיל הכנסות ב-30%?", "מה מצב הפרויקטים הפעילים?"].map(s => (
+                <button key={s} onClick={() => setInput(s)}
+                  className="text-sm bg-card hover:bg-secondary border border-border text-muted-foreground rounded-xl p-3 text-right transition-colors">
+                  {s}
+                </button>
+              ))}
+            </div>
+            {/* Input at bottom of empty state */}
+            <div className="w-full max-w-2xl">
+              <ChatInput
+                input={input}
+                setInput={setInput}
+                onSend={handleSend}
+                loading={loading}
+                phase={phase}
+                textareaRef={textareaRef}
+                onKeyDown={handleKeyDown}
+              />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {(phase === "running" || phase === "done") && (
-              <div className="flex -space-x-2">
-                {activeAgents.slice(0, 5).map(a => (
-                  <div key={a.id} className="w-7 h-7 rounded-full border-2 border-background flex items-center justify-center text-xs"
-                    style={{ backgroundColor: a.color ? `${a.color}30` : "hsl(var(--secondary))" }}>
-                    {a.avatar_emoji}
-                  </div>
+        ) : (
+          <>
+            {/* Messages scroll area */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-2xl mx-auto px-4 py-8">
+                {messages.map(msg => (
+                  <MessageBubble key={msg.id} message={msg} agents={agents} />
                 ))}
+
+                {loading && (
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    </div>
+                    <span className="text-sm text-muted-foreground">{currentSpeaker || "טוען..."} מכין תגובה...</span>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+
+            {/* Confirm Panel */}
+            {phase === "confirming" && recommendation && (
+              <ConfirmPanel
+                recommendation={recommendation}
+                allAgents={agents}
+                onConfirm={handleConfirm}
+              />
+            )}
+
+            {/* Decision Panel */}
+            {decisions.length > 0 && (
+              <div className="max-w-2xl mx-auto w-full px-4">
+                <DecisionPanel decisions={decisions} agents={agents} onDirectiveCreated={() => {}} />
               </div>
             )}
+
+            {/* Action bar (done state) */}
             {phase === "done" && (
-              <div className="flex gap-2">
+              <div className="flex justify-center gap-2 pb-2 px-4">
                 <Button variant="outline" size="sm" onClick={() => setShowExportModal(true)} className="text-xs h-7 rounded-lg gap-1">
                   <FileText className="w-3 h-3" /> סיכום Output
                 </Button>
@@ -490,107 +527,30 @@ export default function BoardChat() {
                 })} className="text-xs h-7 rounded-lg gap-1">
                   <Download className="w-3 h-3" /> ייצוא
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleNewSession} className="text-xs h-7 rounded-lg">
-                  + דיון חדש
+                <Button variant="outline" size="sm" onClick={handleNewSession} className="text-xs h-7 rounded-lg gap-1">
+                  <Plus className="w-3 h-3" /> דיון חדש
                 </Button>
               </div>
             )}
-          </div>
-        </div>
+
+            {/* Input */}
+            {phase !== "confirming" && (
+              <div className="px-4 pb-4 pt-2 max-w-2xl mx-auto w-full">
+                <ChatInput
+                  input={input}
+                  setInput={setInput}
+                  onSend={handleSend}
+                  loading={loading}
+                  phase={phase}
+                  textareaRef={textareaRef}
+                  onKeyDown={handleKeyDown}
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && phase === "idle" && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center">
-              <Sparkles className="w-8 h-8 text-accent" />
-            </div>
-            <div>
-              <p className="text-lg font-bold">ברוכים הבאים לחדר הישיבות</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                הציגו נושא — המנחה יתאם ציפיות, ימליץ על משתתפים ופורמט, ואתם תאשרו לפני תחילת הדיון
-              </p>
-            </div>
-            <div className="grid grid-cols-1 gap-2 w-full max-w-xs mt-2">
-              {["מה האסטרטגיה שלנו לרבעון הבא?", "איך נגדיל הכנסות ב-30%?", "מה מצב הפרויקטים הפעילים?"].map(s => (
-                <button key={s} onClick={() => setInput(s)}
-                  className="text-sm bg-secondary hover:bg-secondary/70 text-muted-foreground rounded-xl p-3 text-right transition-colors">
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {messages.map(msg => (
-          <MessageBubble key={msg.id} message={msg} agents={agents} />
-        ))}
-
-        {loading && (
-          <div className="flex items-center gap-2 text-muted-foreground pl-2">
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="text-xs">{currentSpeaker || "טוען..."} מכין תגובה...</span>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Confirm Panel */}
-      {phase === "confirming" && recommendation && (
-        <ConfirmPanel
-          recommendation={recommendation}
-          allAgents={agents}
-          onConfirm={handleConfirm}
-        />
-      )}
-
-      {/* Decision Panel */}
-      {decisions.length > 0 && (
-        <DecisionPanel decisions={decisions} agents={agents} onDirectiveCreated={() => {}} />
-      )}
-
-      {/* Input */}
-      {phase !== "confirming" && (
-        <div className="p-3 border-t border-border bg-card/50 shrink-0">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
-              placeholder={
-                phase === "idle" ? "הציגו נושא לדיון..." :
-                phase === "running" ? "הוסף הערה תוך כדי הדיון..." :
-                phase === "done" ? "נושא חדש לדיון..." :
-                "ממתין..."
-              }
-              className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 text-right"
-              disabled={loading && phase !== "running"}
-              dir="auto"
-            />
-            <Button
-              onClick={handleSend}
-              disabled={(loading && phase !== "running") || !input.trim()}
-              className="rounded-xl h-auto px-4"
-            >
-              {loading && phase !== "running"
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : phase === "running"
-                ? <MessageSquarePlus className="w-4 h-4" />
-                : <Send className="w-4 h-4" />
-              }
-            </Button>
-          </div>
-          {phase === "running" && (
-            <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-              הדיון מתנהל — ניתן להוסיף הערה בכל עת
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Export Output Modal */}
       {showExportModal && (
         <ExportOutputModal
           topic={pendingTopic}
@@ -599,6 +559,51 @@ export default function BoardChat() {
           onClose={() => setShowExportModal(false)}
         />
       )}
+    </div>
+  );
+}
+
+function ChatInput({ input, setInput, onSend, loading, phase, textareaRef, onKeyDown }) {
+  const placeholder =
+    phase === "idle" ? "הציגו נושא לדיון..." :
+    phase === "running" ? "הוסף הערה תוך כדי הדיון..." :
+    phase === "done" ? "נושא חדש לדיון..." :
+    "ממתין...";
+
+  const isDisabled = loading && phase !== "running";
+  const canSend = input.trim() && !isDisabled;
+
+  return (
+    <div className="relative bg-card border border-border rounded-2xl shadow-lg overflow-hidden">
+      <textarea
+        ref={textareaRef}
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        disabled={isDisabled}
+        dir="auto"
+        rows={1}
+        className="w-full bg-transparent px-4 pt-3.5 pb-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none resize-none leading-relaxed max-h-[200px] text-right"
+      />
+      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+        <p className="text-[10px] text-muted-foreground/60">
+          {phase === "running" ? "Enter לשליחה · Shift+Enter לשורה חדשה" : "Enter לשליחה"}
+        </p>
+        <button
+          onClick={onSend}
+          disabled={!canSend}
+          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+            canSend
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "bg-secondary text-muted-foreground cursor-not-allowed"
+          }`}
+        >
+          {loading && phase !== "running"
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : <ArrowUp className="w-4 h-4" />
+          }
+        </button>
       </div>
     </div>
   );
