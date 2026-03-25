@@ -6,6 +6,9 @@ import PageHeader from "../components/shared/PageHeader";
 import StatsCard from "../components/dashboard/StatsCard";
 import AgentActivityFeed from "../components/dashboard/AgentActivityFeed";
 import QuickDirective from "../components/dashboard/QuickDirective";
+import AgentPerformanceChart from "../components/dashboard/AgentPerformanceChart";
+import BoardMeetingStats from "../components/dashboard/BoardMeetingStats";
+import TaskStatusChart from "../components/dashboard/TaskStatusChart";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
@@ -14,21 +17,24 @@ export default function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [directives, setDirectives] = useState([]);
   const [outputs, setOutputs] = useState([]);
+  const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
-    const [a, t, p, d, o] = await Promise.all([
+    const [a, t, p, d, o, c] = await Promise.all([
       base44.entities.Agent.list(),
-      base44.entities.Task.list("-updated_date", 50),
+      base44.entities.Task.list("-updated_date", 100),
       base44.entities.Project.list(),
-      base44.entities.Directive.list("-created_date", 10),
+      base44.entities.Directive.list("-created_date", 50),
       base44.entities.Output.list(),
+      base44.entities.Conversation.list("-created_date", 100),
     ]);
     setAgents(a);
     setTasks(t);
     setProjects(p);
     setDirectives(d);
     setOutputs(o);
+    setConversations(c);
     setLoading(false);
   };
 
@@ -72,35 +78,20 @@ export default function Dashboard() {
         <StatsCard icon={CheckCircle} label="Completed Tasks" value={completedTasks} color="#10B981" />
       </div>
 
-      {/* Activity & Recent Directives */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-        <AgentActivityFeed agents={agents} tasks={tasks} />
+      {/* Charts Row 1 */}
+      <div className="mt-5">
+        <BoardMeetingStats directives={directives} conversations={conversations} />
+      </div>
 
-        {/* Recent Directives */}
-        <div className="bg-card rounded-xl border border-border p-4 sm:p-6">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Recent Directives</h3>
-          {directives.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No directives issued yet.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {directives.slice(0, 5).map(d => (
-                <div key={d.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-secondary/50 active:bg-secondary/70">
-                  <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <Zap className="w-4 h-4 text-accent" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground line-clamp-2">{d.content}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(d.created_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+        <AgentPerformanceChart agents={agents} tasks={tasks} />
+        <TaskStatusChart tasks={tasks} />
+      </div>
+
+      {/* Activity Feed */}
+      <div className="mt-5">
+        <AgentActivityFeed agents={agents} tasks={tasks} />
       </div>
     </div>
   );
