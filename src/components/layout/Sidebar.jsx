@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Network, MessageSquare, Brain, Heart,
-  FolderKanban, Archive, BookOpen, Settings, Zap, ChevronLeft, ChevronRight, Sparkles, CheckSquare
+  FolderKanban, Archive, BookOpen, Settings, Zap, ChevronLeft, ChevronRight, Sparkles, CheckSquare, History
 } from "lucide-react";
 import { useState } from "react";
 import NotificationBell from "../notifications/NotificationBell";
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { path: "/outputs", icon: Archive, label: "Outputs", label_he: "תוצרים" },
   { path: "/memory", icon: BookOpen, label: "Memory", label_he: "זיכרון" },
   { path: "/tasks", icon: CheckSquare, label: "Tasks", label_he: "משימות" },
+  { path: "/chat-history", icon: History, label: "History", label_he: "היסטוריה" },
   { path: "/settings", icon: Settings, label: "Settings", label_he: "הגדרות" },
 ];
 
