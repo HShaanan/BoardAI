@@ -19,6 +19,7 @@ import Outputs from './pages/Outputs';
 import Memory from './pages/Memory';
 import SettingsPage from './pages/SettingsPage';
 import BoardChat from './pages/BoardChat';
+import Tasks from './pages/Tasks';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -60,6 +61,7 @@ const AuthenticatedApp = () => {
           <Route path="/memory" element={<Memory />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/board-chat" element={<BoardChat />} />
+          <Route path="/tasks" element={<Tasks />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>
