@@ -6,17 +6,17 @@ import {
 import { cn } from "@/lib/utils";
 
 const PRIMARY_NAV = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { path: "/chat", icon: MessageSquare, label: "Chat" },
-  { path: "/directives", icon: Zap, label: "Directives" },
-  { path: "/projects", icon: FolderKanban, label: "Projects" },
+  { path: "/", icon: LayoutDashboard, label: "לוח בקרה" },
+  { path: "/chat", icon: MessageSquare, label: "שיחות" },
+  { path: "/directives", icon: Zap, label: "הנחיות" },
+  { path: "/projects", icon: FolderKanban, label: "פרויקטים" },
 ];
 
 export default function BottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-sidebar/95 backdrop-blur-xl border-t border-sidebar-border safe-area-pb">
+    <nav className="fixed bottom-0 right-0 left-0 z-50 md:hidden bg-sidebar/95 backdrop-blur-xl border-t border-sidebar-border safe-area-pb rtl">
       <div className="flex items-stretch justify-around px-1">
         {PRIMARY_NAV.map((item) => {
           const isActive =

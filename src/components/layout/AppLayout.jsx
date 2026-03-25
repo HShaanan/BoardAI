@@ -4,7 +4,7 @@ import BottomNav from "./BottomNav";
 
 export default function AppLayout() {
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background rtl">
       {/* Sidebar — desktop only */}
       <div className="hidden md:block">
         <Sidebar />

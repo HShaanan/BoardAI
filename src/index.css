@@ -6,6 +6,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    direction: rtl;
+  }
+
   :root {
     --font-inter: 'Inter', sans-serif;
     --font-heebo: 'Heebo', sans-serif;
@@ -94,7 +98,14 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-background text-foreground font-heebo;
+    direction: rtl;
+    text-align: right;
+  }
+
+  input, textarea, select {
+    direction: rtl;
+    text-align: right;
   }
 }
 

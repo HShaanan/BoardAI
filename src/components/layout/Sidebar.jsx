@@ -8,19 +8,19 @@ import NotificationBell from "../notifications/NotificationBell";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { path: "/", icon: LayoutDashboard, label: "Dashboard", label_he: "לוח בקרה" },
-  { path: "/org-chart", icon: Network, label: "Org Chart", label_he: "מבנה ארגוני" },
-  { path: "/chat", icon: MessageSquare, label: "Chat", label_he: "שיחות" },
-  { path: "/directives", icon: Zap, label: "Directives", label_he: "הנחיות" },
-  { path: "/projects", icon: FolderKanban, label: "Projects", label_he: "פרויקטים" },
-  { path: "/brain", icon: Brain, label: "Brain", label_he: "המוח" },
-  { path: "/core", icon: Heart, label: "Core", label_he: "הליבה" },
-  { path: "/outputs", icon: Archive, label: "Outputs", label_he: "תוצרים" },
-  { path: "/memory", icon: BookOpen, label: "Memory", label_he: "זיכרון" },
-  { path: "/tasks", icon: CheckSquare, label: "Tasks", label_he: "משימות" },
-  { path: "/chat-history", icon: History, label: "History", label_he: "היסטוריה" },
-  { path: "/my-agents", icon: UserCog, label: "My Agents", label_he: "סוכנים שלי" },
-  { path: "/settings", icon: Settings, label: "Settings", label_he: "הגדרות" },
+  { path: "/", icon: LayoutDashboard, label_he: "לוח בקרה" },
+  { path: "/org-chart", icon: Network, label_he: "מבנה ארגוני" },
+  { path: "/chat", icon: MessageSquare, label_he: "שיחות" },
+  { path: "/directives", icon: Zap, label_he: "הנחיות" },
+  { path: "/projects", icon: FolderKanban, label_he: "פרויקטים" },
+  { path: "/brain", icon: Brain, label_he: "המוח" },
+  { path: "/core", icon: Heart, label_he: "הליבה" },
+  { path: "/outputs", icon: Archive, label_he: "תוצרים" },
+  { path: "/memory", icon: BookOpen, label_he: "זיכרון" },
+  { path: "/tasks", icon: CheckSquare, label_he: "משימות" },
+  { path: "/chat-history", icon: History, label_he: "היסטוריה" },
+  { path: "/my-agents", icon: UserCog, label_he: "סוכנים שלי" },
+  { path: "/settings", icon: Settings, label_he: "הגדרות" },
 ];
 
 export default function Sidebar() {
@@ -41,7 +41,7 @@ export default function Sidebar() {
         </div>
         {!collapsed && (
           <span className="font-bold text-foreground text-lg tracking-tight whitespace-nowrap">
-            My Company
+            החברה שלי
           </span>
         )}
       </div>
@@ -63,7 +63,7 @@ export default function Sidebar() {
               )}
             >
               <item.icon className={cn("w-5 h-5 shrink-0", isActive && "text-primary")} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              {!collapsed && <span className="truncate">{item.label_he}</span>}
             </Link>
           );
         })}
