@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Send, Loader2, ArrowLeft, Users, Download } from "lucide-react";
-import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
 import { Button } from "@/components/ui/button";
 import AgentAvatar from "../components/shared/AgentAvatar";
 import ChatAgentList from "../components/chat/ChatAgentList";
 import ChatMessageBubble from "../components/chat/ChatMessageBubble";
+import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
 
 export default function Chat() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -18,6 +18,7 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [conversation, setConversation] = useState(null);
   const [core, setCore] = useState(null);
+  const [showAgentList, setShowAgentList] = useState(true);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function Chat() {
       if (c.length > 0) setCore(c[0]);
       if (preselectedAgentId) {
         const found = a.find(ag => ag.id === preselectedAgentId);
-        if (found) handleSelectAgent(found, a);
+        if (found) handleSelectAgent(found);
       }
     });
   }, []);
@@ -40,7 +41,6 @@ export default function Chat() {
 
   const handleSelectAgent = async (agent) => {
     setSelectedAgent(agent);
-    // Find or create conversation
     const convos = await base44.entities.Conversation.filter({ agent_id: agent.id, type: "individual" });
     let convo;
     if (convos.length > 0) {
@@ -67,20 +67,16 @@ export default function Chat() {
       content: input.trim(),
     });
     setMessages(prev => [...prev, userMsg]);
+    const currentInput = input.trim();
     setInput("");
 
-    // Build prompt for the agent
-    const coreContext = core ? `
-COMPANY CORE:
-Company: ${core.company_name || "Not set"}
-Mission: ${core.mission || "Not set"}
-Vision: ${core.vision || "Not set"}
-Target Audience: ${core.target_audience || "Not set"}
-Tone: ${core.tone_of_voice || "Not set"}
-Guidelines: ${core.brand_guidelines || "Not set"}
-Goals: ${core.business_goals || "Not set"}
-Rules: ${core.constitution_rules || "Not set"}
-` : "";
+    // Fetch knowledge base entries to inject into agent context
+    const brainEntries = await base44.entities.BrainEntry.list("-created_date", 10);
+    const knowledgeCtx = brainEntries.length > 0
+      ? `\n\nORGANIZATIONAL KNOWLEDGE BASE (past meetings & conversations):\n${brainEntries.map(e => `### ${e.title}\n${e.content?.slice(0, 600)}`).join("\n\n---\n\n")}`
+      : "";
+
+    const coreContext = core ? `\nCOMPANY CORE:\nCompany: ${core.company_name || "Not set"}\nMission: ${core.mission || "Not set"}\nVision: ${core.vision || "Not set"}\nTarget Audience: ${core.target_audience || "Not set"}\nTone: ${core.tone_of_voice || "Not set"}\nGuidelines: ${core.brand_guidelines || "Not set"}\nGoals: ${core.business_goals || "Not set"}\nRules: ${core.constitution_rules || "Not set"}\n` : "";
 
     const recentContext = messages.slice(-6).map(m =>
       `${m.role === "board" ? "Board" : selectedAgent.title}: ${m.content}`
@@ -95,8 +91,7 @@ YOUR IDENTITY:
 - Communication Style: ${selectedAgent.communication_style}
 - Creativity Level: ${selectedAgent.creativity_level}/10
 - Verbosity Level: ${selectedAgent.verbosity_level}/10
-
-${coreContext}
+${coreContext}${knowledgeCtx}
 
 RECENT CONVERSATION:
 ${recentContext}
@@ -107,11 +102,11 @@ RULES:
 3. Address the user as "the Board" or respectfully as a board member
 4. If unsure, recommend the Board decide
 5. Flag risks or concerns proactively
-6. Be helpful, professional, and provide actionable insights
+6. Use the organizational knowledge base above to reference past decisions and meetings
 7. Respond in the same language the Board uses`;
 
     const response = await base44.integrations.Core.InvokeLLM({
-      prompt: `${systemPrompt}\n\nBoard directive: ${input.trim()}`,
+      prompt: `${systemPrompt}\n\nBoard directive: ${currentInput}`,
     });
 
     const agentMsg = await base44.entities.ChatMessage.create({
@@ -125,8 +120,6 @@ RULES:
     setSending(false);
   };
 
-  const [showAgentList, setShowAgentList] = useState(!selectedAgent);
-
   const handleSelectAgentMobile = async (agent) => {
     await handleSelectAgent(agent);
     setShowAgentList(false);
@@ -134,7 +127,7 @@ RULES:
 
   return (
     <div className="flex h-[calc(100dvh-56px)] md:h-screen overflow-hidden">
-      {/* Agent List — full screen on mobile when visible */}
+      {/* Agent List */}
       <div className={`
         absolute inset-0 z-20 md:static md:z-auto md:block
         transition-transform duration-300
@@ -183,13 +176,16 @@ RULES:
                 <p className="text-xs text-muted-foreground truncate">{selectedAgent.title_he}</p>
               </div>
               {messages.length > 2 && (
-                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground"
+                <Button
+                  variant="ghost" size="sm"
+                  className="h-7 text-xs gap-1 text-muted-foreground"
                   onClick={() => exportConversationToKnowledge({
                     title: `שיחה עם ${selectedAgent.title}`,
                     messages,
                     type: "agent_chat",
                     agentName: selectedAgent.title
-                  })}>
+                  })}
+                >
                   <Download className="w-3 h-3" /> סיכום
                 </Button>
               )}

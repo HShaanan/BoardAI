@@ -314,6 +314,12 @@ ${agentsList}
   const runDiscussion = async (selectedAgents, format, topic) => {
     const coreCtx = core ? `חברה: ${core.company_name}\nמשימה: ${core.mission}\nחזון: ${core.vision}\nגיידליינס: ${core.brand_guidelines}` : "";
 
+    // Inject knowledge base into all agent prompts
+    const brainEntries = await base44.entities.BrainEntry.list("-created_date", 8);
+    const knowledgeCtx = brainEntries.length > 0
+      ? `\n\nמאגר ידע ארגוני (ישיבות והחלטות קודמות):\n${brainEntries.map(e => `### ${e.title}\n${e.content?.slice(0, 500)}`).join("\n---\n")}`
+      : "";
+
     if (format === "statements") {
       // Each agent speaks once independently
       for (const agent of selectedAgents) {
@@ -325,7 +331,7 @@ ${agentsList}
         });
 
         const resp = await base44.integrations.Core.InvokeLLM({
-          prompt: buildAgentPrompt(agent, topic, coreCtx, [], "statement")
+          prompt: buildAgentPrompt(agent, topic, coreCtx, [], "statement", knowledgeCtx)
         });
         await addMsg(conversation, {
           role: "agent", content: resp,
@@ -346,7 +352,7 @@ ${agentsList}
         });
 
         const resp = await base44.integrations.Core.InvokeLLM({
-          prompt: buildAgentPrompt(agent, topic, coreCtx, discussionHistory, "debate")
+          prompt: buildAgentPrompt(agent, topic, coreCtx, discussionHistory, "debate", knowledgeCtx)
         });
         discussionHistory.push({ agent: agent.title, content: resp });
         await addMsg(conversation, {
@@ -427,7 +433,7 @@ ${agentsList}
     else if (phase === "running") handleInterject();
   };
 
-  const buildAgentPrompt = (agent, topic, coreCtx, history, mode) => {
+  const buildAgentPrompt = (agent, topic, coreCtx, history, mode, knowledgeCtx = "") => {
     const histCtx = history.length > 0
       ? `\nמה שנאמר עד כה:\n${history.map(h => `${h.agent}: ${h.content}`).join("\n\n")}`
       : "";
@@ -438,13 +444,15 @@ ${agentsList}
 יצירתיות: ${agent.creativity_level}/10 | פירוטיות: ${agent.verbosity_level}/10
 
 ${coreCtx}
+${knowledgeCtx}
 ${histCtx}
 
 נושא: "${topic}"
 
-${mode === "debate"
-  ? "הגב לדברים שנאמרו. אפשר להסכים, לחלוק, לחדד. היה ממוקד ותורם לדיון."
-  : "הבע את עמדתך המקצועית בנושא. תן המלצה ברורה."
+${
+  mode === "debate"
+    ? "הגב לדברים שנאמרו. אפשר להסכים, לחלוק, לחדד. היה ממוקד ותורם לדיון."
+    : "הבע את עמדתך המקצועית. תן המלצה ברורה. עשה שימוש בנתונים ממאגר הידע אםרלוונטים."
 }
 הגב בשפה שבה נוסח הנושא.`;
   };
