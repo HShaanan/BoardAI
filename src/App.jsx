@@ -18,7 +18,7 @@ import Core from './pages/Core';
 import Outputs from './pages/Outputs';
 import Memory from './pages/Memory';
 import SettingsPage from './pages/SettingsPage';
-import BoardChat from './pages/BoardChat';
+
 import Tasks from './pages/Tasks';
 
 const AuthenticatedApp = () => {
@@ -60,7 +60,7 @@ const AuthenticatedApp = () => {
           <Route path="/outputs" element={<Outputs />} />
           <Route path="/memory" element={<Memory />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/board-chat" element={<BoardChat />} />
+          <Route path="/board-chat" element={<Chat />} />
           <Route path="/tasks" element={<Tasks />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />

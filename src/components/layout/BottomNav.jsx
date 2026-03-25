@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 const PRIMARY_NAV = [
   { path: "/", icon: LayoutDashboard, label: "Dashboard" },
   { path: "/chat", icon: MessageSquare, label: "Chat" },
-  { path: "/board-chat", icon: Sparkles, label: "Board Room" },
   { path: "/directives", icon: Zap, label: "Directives" },
   { path: "/projects", icon: FolderKanban, label: "Projects" },
 ];

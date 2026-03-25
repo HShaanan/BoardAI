@@ -17,7 +17,6 @@ const NAV_ITEMS = [
   { path: "/core", icon: Heart, label: "Core", label_he: "הליבה" },
   { path: "/outputs", icon: Archive, label: "Outputs", label_he: "תוצרים" },
   { path: "/memory", icon: BookOpen, label: "Memory", label_he: "זיכרון" },
-  { path: "/board-chat", icon: Sparkles, label: "Board Room", label_he: "חדר ישיבות" },
   { path: "/tasks", icon: CheckSquare, label: "Tasks", label_he: "משימות" },
   { path: "/settings", icon: Settings, label: "Settings", label_he: "הגדרות" },
 ];
