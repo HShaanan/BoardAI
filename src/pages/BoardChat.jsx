@@ -373,11 +373,20 @@ export default function BoardChat() {
     await addMsg(conversation, { role: "board", content: comment });
   };
 
-  const handleNewSession = () => {
+  const handleNewSession = async () => {
     setPhase("idle");
     setPendingTopic("");
     setRecommendation(null);
     setActiveAgents([]);
+    setDecisions([]);
+    setMessages([]);
+    // Create a fresh conversation
+    const newConvo = await base44.entities.Conversation.create({
+      type: "meeting",
+      topic: "board_room_discussion",
+      participants: agents.map(ag => ag.id),
+    });
+    setConversation(newConvo);
   };
 
   const handleSend = () => {
