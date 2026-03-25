@@ -13,12 +13,7 @@ import FeedbackButtons from "../components/shared/FeedbackButtons";
 function MessageTimestamp({ ts }) {
   if (!ts) return null;
   const date = new Date(ts);
-  const formatted = date.toLocaleString(undefined, {
-    month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit"
-  });
-  return <span className="text-[10px] text-muted-foreground/60 mt-1 block">{formatted}</span>;
-}
+  if (isNaN(date.getTime())) return null;
 
 function MessageBubble({ message, agentMap }) {
   const isUser = message.role === "user";

@@ -10,6 +10,7 @@ import FeedbackButtons from "../components/shared/FeedbackButtons";
 function MessageTimestamp({ ts }) {
   if (!ts) return null;
   const date = new Date(ts);
+  if (isNaN(date.getTime())) return null;
   const formatted = date.toLocaleString(undefined, {
     month: "short", day: "numeric",
     hour: "2-digit", minute: "2-digit"
