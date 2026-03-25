@@ -91,7 +91,7 @@ function ConfirmPanel({ recommendation, allAgents, onConfirm }) {
   const selectedAgents = allAgents.filter(a => selectedKeys.includes(a.role_key));
 
   return (
-    <div className="mx-4 mb-3 bg-card border border-primary/40 rounded-2xl overflow-hidden">
+    <div className="mx-4 mb-3 bg-card border border-primary/40 rounded-2xl overflow-hidden max-h-[60vh] flex flex-col">
       <button
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-primary/5 transition-colors"
@@ -104,7 +104,7 @@ function ConfirmPanel({ recommendation, allAgents, onConfirm }) {
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-4">
+        <div className="px-4 pb-4 space-y-4 overflow-y-auto flex-1">
           {/* Agent chips */}
           <div>
             <p className="text-xs text-muted-foreground mb-2">בחר/בטל משתתפים:</p>
