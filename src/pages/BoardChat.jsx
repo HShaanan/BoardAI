@@ -175,7 +175,7 @@ export default function BoardChat() {
   const [activeAgents, setActiveAgents] = useState([]);
   const [discussionFormat, setDiscussionFormat] = useState("statements");
   const [showExportModal, setShowExportModal] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [meetings, setMeetings] = useState([]);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
