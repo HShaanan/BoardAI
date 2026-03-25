@@ -64,6 +64,18 @@ ${transcript}`;
     tags: type === "board_meeting" ? ["ישיבה", "החלטות", "דיון"] : ["שיחה", agentName || "סוכן"],
   });
 
+  // Save as MemoryEntry for ALL active agents
+  const allAgents = await base44.entities.Agent.filter({ is_active: true });
+  const memoryContent = `סיכום ${type === "board_meeting" ? "ישיבת דירקטוריון" : `שיחה עם ${agentName}`}: "${title}"\n\n${summary}`;
+  await Promise.all(allAgents.map(agent =>
+    base44.entities.MemoryEntry.create({
+      agent_id: agent.id,
+      content: memoryContent,
+      memory_type: "decision",
+      is_active: true,
+    })
+  ));
+
   // Download .txt file
   const blob = new Blob([fullContent], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
