@@ -198,7 +198,7 @@ export default function BoardChat() {
       seen.add(m.content);
       return true;
     });
-    deduped.sort((a, b) => (a.ts > b.ts ? 1 : -1));
+    deduped.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
     setMessages(deduped);
   };
 
