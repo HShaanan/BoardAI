@@ -48,17 +48,13 @@ ${transcript}
 
 ---
 
-${summary}
+${summary}`;
 
----
-
-## תמליל מלא
-
-${transcript}`;
+  const safeContent = fullContent.length > 50000 ? fullContent.slice(0, 50000) + "\n\n[תוכן קוצר בגלל אורך מקסימאלי]" : fullContent;
 
   const entry = await base44.entities.BrainEntry.create({
     title,
-    content: fullContent,
+    content: safeContent,
     source_type: "note",
     category: type === "board_meeting" ? "board_meetings" : "agent_chats",
     tags: type === "board_meeting" ? ["ישיבה", "החלטות", "דיון"] : ["שיחה", agentName || "סוכן"],
@@ -66,7 +62,7 @@ ${transcript}`;
 
   // Save as MemoryEntry for ALL active agents
   const allAgents = await base44.entities.Agent.filter({ is_active: true });
-  const memoryContent = `סיכום ${type === "board_meeting" ? "ישיבת דירקטוריון" : `שיחה עם ${agentName}`}: "${title}"\n\n${summary}`;
+  const memoryContent = `סיכום ${type === "board_meeting" ? "ישיבת דירקטוריון" : `שיחה עם ${agentName}`}: "${title}"\n\n${summary.slice(0, 3000)}`;
   await Promise.all(allAgents.map(agent =>
     base44.entities.MemoryEntry.create({
       agent_id: agent.id,
@@ -76,8 +72,18 @@ ${transcript}`;
     })
   ));
 
-  // Download .txt file
-  const blob = new Blob([fullContent], { type: "text/plain;charset=utf-8" });
+  // Download .txt file (full content including transcript)
+  const downloadContent = `# ${title}
+תאריך: ${new Date().toLocaleDateString("he-IL")}
+
+${summary}
+
+---
+
+## תמליל
+
+${transcript}`;
+  const blob = new Blob([downloadContent], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
