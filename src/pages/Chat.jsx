@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Send, Loader2, ArrowLeft, Users } from "lucide-react";
+import { Send, Loader2, ArrowLeft, Users, Download } from "lucide-react";
+import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
 import { Button } from "@/components/ui/button";
 import AgentAvatar from "../components/shared/AgentAvatar";
 import ChatAgentList from "../components/chat/ChatAgentList";
@@ -181,6 +182,17 @@ RULES:
                 <p className="text-sm font-semibold text-foreground truncate">{selectedAgent.title}</p>
                 <p className="text-xs text-muted-foreground truncate">{selectedAgent.title_he}</p>
               </div>
+              {messages.length > 2 && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-muted-foreground"
+                  onClick={() => exportConversationToKnowledge({
+                    title: `שיחה עם ${selectedAgent.title}`,
+                    messages,
+                    type: "agent_chat",
+                    agentName: selectedAgent.title
+                  })}>
+                  <Download className="w-3 h-3" /> סיכום
+                </Button>
+              )}
             </div>
 
             {/* Messages */}

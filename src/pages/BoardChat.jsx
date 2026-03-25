@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Send, Loader2, Sparkles, Users, Check, X, MessageSquarePlus, ChevronDown, ChevronUp } from "lucide-react";
+import { Send, Loader2, Sparkles, Users, Check, X, MessageSquarePlus, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
 import { Button } from "@/components/ui/button";
 import AgentAvatar from "../components/shared/AgentAvatar";
 import DecisionPanel from "../components/boardchat/DecisionPanel";
@@ -395,6 +396,14 @@ ${agentsList}
     setCurrentSpeaker(null);
     setLoading(false);
     setPhase("done");
+
+    // Auto-export to knowledge base
+    const allMsgs = await base44.entities.ChatMessage.filter({ conversation_id: conversation.id });
+    exportConversationToKnowledge({
+      title: `ישיבת דירקטוריון: ${topic}`,
+      messages: allMsgs.sort((a, b) => new Date(a.created_date) - new Date(b.created_date)),
+      type: "board_meeting"
+    });
   };
 
   // User interrupts / adds comment mid-discussion
@@ -483,9 +492,18 @@ ${mode === "debate"
               </div>
             )}
             {phase === "done" && (
-              <Button variant="outline" size="sm" onClick={handleNewSession} className="text-xs h-7 rounded-lg">
-                + דיון חדש
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => exportConversationToKnowledge({
+                  title: `ישיבת דירקטוריון: ${pendingTopic}`,
+                  messages,
+                  type: "board_meeting"
+                })} className="text-xs h-7 rounded-lg gap-1">
+                  <Download className="w-3 h-3" /> ייצוא
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleNewSession} className="text-xs h-7 rounded-lg">
+                  + דיון חדש
+                </Button>
+              </div>
             )}
           </div>
         </div>
