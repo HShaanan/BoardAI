@@ -36,6 +36,12 @@ export default function Directives() {
     setLoading(false);
   };
 
+  const handleTaskStatusChange = async (taskId, newStatus) => {
+    await base44.entities.Task.update(taskId, { status: newStatus });
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    toast.success(newStatus === "approved" ? "המשימה אושרה ✓" : "המשימה נדחתה");
+  };
+
   useEffect(() => { loadData(); }, []);
 
   const handleSend = async () => {
@@ -225,6 +231,7 @@ Return a JSON breakdown of tasks to create. Each task must be assigned to one ag
               directive={d}
               agentMap={agentMap}
               tasks={tasks}
+              onTaskStatusChange={handleTaskStatusChange}
             />
           ))}
         </div>

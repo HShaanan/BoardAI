@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronDown, ChevronUp, CheckCircle2, Clock, User2, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, User2, Loader2 } from "lucide-react";
 import AgentAvatar from "../shared/AgentAvatar";
 import StatusBadge from "../shared/StatusBadge";
 
@@ -11,7 +11,7 @@ const PRIORITY_COLORS = {
   critical: "text-red-400",
 };
 
-export default function DirectiveBreakdown({ directive, agentMap, tasks }) {
+export default function DirectiveBreakdown({ directive, agentMap, tasks, onTaskStatusChange }) {
   const [expanded, setExpanded] = useState(true);
   const directiveTasks = tasks.filter(t => t.directive_id === directive.id);
 
@@ -71,7 +71,33 @@ export default function DirectiveBreakdown({ directive, agentMap, tasks }) {
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{task.description}</p>
                   )}
                 </div>
-                <StatusBadge status={task.status} />
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <StatusBadge status={task.status} />
+                  {task.status === "review" && onTaskStatusChange && (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => onTaskStatusChange(task.id, "approved")}
+                        className="flex items-center gap-1 text-[10px] bg-green-500/20 text-green-400 hover:bg-green-500/30 px-2 py-0.5 rounded-full transition-colors"
+                      >
+                        <CheckCircle2 className="w-3 h-3" /> אשר
+                      </button>
+                      <button
+                        onClick={() => onTaskStatusChange(task.id, "rejected")}
+                        className="flex items-center gap-1 text-[10px] bg-red-500/20 text-red-400 hover:bg-red-500/30 px-2 py-0.5 rounded-full transition-colors"
+                      >
+                        <XCircle className="w-3 h-3" /> דחה
+                      </button>
+                    </div>
+                  )}
+                  {(task.status === "todo" || task.status === "in_progress") && onTaskStatusChange && (
+                    <button
+                      onClick={() => onTaskStatusChange(task.id, "approved")}
+                      className="flex items-center gap-1 text-[10px] bg-green-500/20 text-green-400 hover:bg-green-500/30 px-2 py-0.5 rounded-full transition-colors"
+                    >
+                      <CheckCircle2 className="w-3 h-3" /> אשר
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
