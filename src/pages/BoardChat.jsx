@@ -290,6 +290,7 @@ ${agentsList}
     setDiscussionFormat(format);
     setPhase("running");
     setLoading(true);
+    setCurrentSpeaker("מתחיל דיון...");
 
     const names = selectedAgents.map(a => a.title).join(", ");
     await addMsg(conversation, {
@@ -298,7 +299,14 @@ ${agentsList}
       agent_role_key: "facilitator"
     });
 
-    await runDiscussion(selectedAgents, format, pendingTopic);
+    try {
+      await runDiscussion(selectedAgents, format, pendingTopic);
+    } catch (e) {
+      console.error(e);
+      setCurrentSpeaker(null);
+      setLoading(false);
+      setPhase("done");
+    }
   };
 
   // Phase 3: Run the actual discussion
@@ -511,10 +519,10 @@ ${mode === "debate"
           <MessageBubble key={msg.id} message={msg} agents={agents} />
         ))}
 
-        {loading && currentSpeaker && (
+        {loading && (
           <div className="flex items-center gap-2 text-muted-foreground pl-2">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="text-xs">{currentSpeaker} מכין תגובה...</span>
+            <span className="text-xs">{currentSpeaker || "טוען..."} מכין תגובה...</span>
           </div>
         )}
         <div ref={messagesEndRef} />
