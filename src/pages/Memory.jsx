@@ -23,6 +23,27 @@ const TYPE_COLORS = {
   feedback: "bg-yellow-500/20 text-yellow-400",
 };
 
+const TAG_KEYWORDS = {
+  "אסטרטגיה": ["תכנית", "אסטרטגיה", "תחזוקה", "מטרה", "כיוון"],
+  "פיתוח": ["קוד", "פיתוח", "טכנולוגיה", "מערכת", "API"],
+  "מכירות": ["חוזה", "לקוח", "מכירה", "הצעה", "עסקה"],
+  "שיתוף פעולה": ["צוות", "שיתוף", "מפגש", "דיון", "קומוניקציה"],
+  "תקציב": ["תקציב", "עלות", "הוצאה", "משאבים", "כספים"],
+  "זמן": ["לוח זמנים", "דדליין", "תאריך", "לוח", "זמן"],
+  "איכות": ["בדיקה", "איכות", "תקן", "שגיאה", "אימות"],
+};
+
+const generateTags = (content) => {
+  const text = (content || "").toLowerCase();
+  const tags = new Set();
+  Object.entries(TAG_KEYWORDS).forEach(([tag, keywords]) => {
+    if (keywords.some(kw => text.includes(kw))) {
+      tags.add(tag);
+    }
+  });
+  return Array.from(tags);
+};
+
 export default function Memory() {
   const [entries, setEntries] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -31,6 +52,7 @@ export default function Memory() {
   const [showAdd, setShowAdd] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [form, setForm] = useState({ content: "", memory_type: "lesson", agent_id: "", title: "", subtitle: "" });
+  const [selectedTags, setSelectedTags] = useState([]);
 
   const loadData = async () => {
     const [m, a] = await Promise.all([
@@ -64,10 +86,14 @@ export default function Memory() {
     loadData();
   };
 
-  const filtered = entries.filter(e =>
-    e.content.toLowerCase().includes(search.toLowerCase()) ||
-    (e.title && e.title.toLowerCase().includes(search.toLowerCase()))
-  );
+  const allTags = [...new Set(entries.flatMap(e => generateTags(e.content || "")))].sort();
+
+  const filtered = entries.filter(e => {
+    const matchesSearch = e.content.toLowerCase().includes(search.toLowerCase()) || (e.title && e.title.toLowerCase().includes(search.toLowerCase()));
+    if (selectedTags.length === 0) return matchesSearch;
+    const entryTags = generateTags(e.content || "");
+    return matchesSearch && selectedTags.some(tag => entryTags.includes(tag));
+  });
 
   if (loading) {
     return (
@@ -93,6 +119,24 @@ export default function Memory() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חפש בזיכרונות..." className="pl-10 bg-card" />
       </div>
+
+      {allTags.length > 0 && (
+        <div className="mb-6 flex flex-wrap gap-2">
+          {allTags.map(tag => (
+            <button
+              key={tag}
+              onClick={() => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                selectedTags.includes(tag)
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+              }`}
+            >
+              #{tag}
+            </button>
+          ))}
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="text-center py-16">
@@ -125,6 +169,13 @@ export default function Memory() {
                     </div>
                     <p className="text-sm font-semibold text-foreground">{entry.title || "בלי כותרת"}</p>
                     {entry.subtitle && <p className="text-xs text-muted-foreground mt-1">{entry.subtitle}</p>}
+                    {generateTags(entry.content).length > 0 && (
+                      <div className="flex gap-1 flex-wrap mt-2">
+                        {generateTags(entry.content).map(tag => (
+                          <span key={tag} className="text-xs bg-secondary/50 text-muted-foreground px-2 py-0.5 rounded">#{tag}</span>
+                        ))}
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground mt-2">
                       {new Date(entry.created_date).toLocaleDateString("he-IL")}
                     </p>
@@ -214,7 +265,7 @@ export default function Memory() {
           <div className="bg-card rounded-2xl border border-border max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="sticky top-0 bg-card border-b border-border flex items-center justify-between p-6">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[selectedEntry.memory_type]}`}>
                     {TYPE_LABELS[selectedEntry.memory_type]}
                   </span>
@@ -222,6 +273,13 @@ export default function Memory() {
                     <span className="text-xs text-muted-foreground">{agents.find(a => a.id === selectedEntry.agent_id)?.title_he || agents.find(a => a.id === selectedEntry.agent_id)?.title}</span>
                   )}
                 </div>
+                {generateTags(selectedEntry.content).length > 0 && (
+                  <div className="flex gap-1 flex-wrap mb-2">
+                    {generateTags(selectedEntry.content).map(tag => (
+                      <span key={tag} className="text-xs bg-secondary/50 text-muted-foreground px-2 py-0.5 rounded">#{tag}</span>
+                    ))}
+                  </div>
+                )}
                 <h2 className="text-2xl font-bold text-foreground">{selectedEntry.title || "בלי כותרת"}</h2>
                 {selectedEntry.subtitle && <p className="text-sm text-muted-foreground mt-1">{selectedEntry.subtitle}</p>}
               </div>
