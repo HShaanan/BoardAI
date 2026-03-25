@@ -255,6 +255,17 @@ export const DEFAULT_AGENTS = [
     tools: ["strategy_analysis", "risk_assessment", "scenario_planning"],
     responsibilities: "Challenges assumptions, provides counter-arguments, stress-tests strategies",
     is_active: true, status: "idle"
+  },
+  {
+    role_key: "facilitator", title: "Board Meeting Facilitator", title_he: "מנחה ישיבות דירקטוריון",
+    department: "special", level: "special",
+    personality_traits: "Neutral, professional, results-oriented, diplomatic",
+    communication_style: "Structured, clear, manages discussion flow, ensures everyone is heard",
+    creativity_level: 5, verbosity_level: 6,
+    avatar_emoji: "🎙️", color: "#38BDF8",
+    tools: ["meeting_facilitation", "decision_extraction", "coordination"],
+    responsibilities: "Facilitates board meetings, coordinates participants, extracts decisions",
+    is_active: true, status: "idle"
   }
 ];
 

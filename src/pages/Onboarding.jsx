@@ -41,8 +41,11 @@ export default function Onboarding({ onComplete }) {
       is_setup_complete: true,
     });
 
-    // Seed all agents
-    await base44.entities.Agent.bulkCreate(DEFAULT_AGENTS);
+    // Seed agents only if none exist yet
+    const existing = await base44.entities.Agent.list();
+    if (existing.length === 0) {
+      await base44.entities.Agent.bulkCreate(DEFAULT_AGENTS);
+    }
 
     setLoading(false);
     onComplete();

@@ -10,11 +10,39 @@ export default function QuickDirective({ onDirectiveCreated }) {
   const handleSubmit = async () => {
     if (!content.trim()) return;
     setLoading(true);
-    await base44.entities.Directive.create({
+
+    const directive = await base44.entities.Directive.create({
       content: content.trim(),
       priority: "medium",
       status: "issued"
     });
+
+    // Trigger Chief of Staff via real agent SDK
+    const convo = await base44.agents.createConversation({
+      agent_name: "chief_of_staff",
+      metadata: { title: `Directive: ${content.trim().slice(0, 60)}` }
+    });
+    base44.agents.addMessage(convo, {
+      role: "user",
+      content: `Directive ID: ${directive.id}\n\nBoard Directive: "${content.trim()}"\n\nPriority: medium\n\nAnalyze this directive, break it into tasks, assign to relevant agents, and provide a summary.`
+    }).then(async () => {
+      // Poll and update directive with response
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        const updated = await base44.agents.getConversation(convo.id);
+        const assistantMsgs = (updated.messages || []).filter(m => m.role === "assistant");
+        if (assistantMsgs.length > 0 || attempts > 20) {
+          clearInterval(poll);
+          const response = assistantMsgs[assistantMsgs.length - 1]?.content;
+          if (response) {
+            await base44.entities.Directive.update(directive.id, { status: "parsed", ai_response: response });
+          }
+          onDirectiveCreated?.();
+        }
+      }, 1500);
+    });
+
     setContent("");
     setLoading(false);
     onDirectiveCreated?.();

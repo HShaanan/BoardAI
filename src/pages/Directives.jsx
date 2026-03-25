@@ -43,40 +43,40 @@ export default function Directives() {
       status: "issued",
     });
 
-    // Use Chief of Staff to parse the directive
-    const chiefOfStaff = agents.find(a => a.role_key === "chief_of_staff");
+    // Use the real Chief of Staff agent via base44.agents SDK
     const coreContext = core ? `Company: ${core.company_name}. Mission: ${core.mission}. Goals: ${core.business_goals}.` : "";
+    const agentsList = agents.map(a => `${a.title} (${a.role_key})`).join(", ");
 
-    const prompt = `You are the Chief of Staff (ראש מטה).
-${coreContext}
+    const prompt = `${coreContext}\n\nDirective ID: ${directive.id}\nPriority: ${priority}\n\nBoard Directive: "${content.trim()}"\n\nAvailable agents: ${agentsList}\n\nAnalyze this directive, create tasks in the database, and provide a breakdown.`;
 
-The Board has issued the following directive:
-"${content.trim()}"
-
-Priority: ${priority}
-
-Analyze this directive and provide:
-1. A summary of what needs to be done
-2. Which agents/roles should be involved
-3. Suggested task breakdown
-4. Estimated timeline
-5. Potential risks or considerations
-
-Available agents: ${agents.map(a => `${a.title} (${a.role_key})`).join(", ")}
-
-Be concise, strategic, and action-oriented. Respond in the same language as the directive.`;
-
-    const response = await base44.integrations.Core.InvokeLLM({ prompt });
-
-    await base44.entities.Directive.update(directive.id, {
-      status: "parsed",
-      ai_response: response,
+    const convo = await base44.agents.createConversation({
+      agent_name: "chief_of_staff",
+      metadata: { title: `Directive: ${content.trim().slice(0, 60)}` }
     });
 
-    setContent("");
-    toast.success("Directive issued and parsed by Chief of Staff!");
-    setSending(false);
-    loadData();
+    await base44.agents.addMessage(convo, { role: "user", content: prompt });
+
+    // Poll for response
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const updated = await base44.agents.getConversation(convo.id);
+      const assistantMsgs = (updated.messages || []).filter(m => m.role === "assistant");
+      if (assistantMsgs.length > 0 || attempts > 30) {
+        clearInterval(poll);
+        const response = assistantMsgs[assistantMsgs.length - 1]?.content || "";
+        if (response) {
+          await base44.entities.Directive.update(directive.id, {
+            status: "parsed",
+            ai_response: response,
+          });
+        }
+        setContent("");
+        toast.success("Directive issued and processed by Chief of Staff!");
+        setSending(false);
+        loadData();
+      }
+    }, 1500);
   };
 
   if (loading) {
