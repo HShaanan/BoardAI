@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Send, Loader2, Sparkles, Users, Check, X, MessageSquarePlus, ChevronDown, ChevronUp, Download, FileText } from "lucide-react";
+import { Send, Loader2, Sparkles, Users, Check, X, MessageSquarePlus, ChevronDown, ChevronUp, Download, FileText, PanelLeftOpen } from "lucide-react";
+import MeetingSidebar from "../components/boardchat/MeetingSidebar";
 import ExportOutputModal from "../components/boardchat/ExportOutputModal";
 import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
 import { Button } from "@/components/ui/button";
@@ -189,7 +190,14 @@ export default function BoardChat() {
   const [activeAgents, setActiveAgents] = useState([]);
   const [discussionFormat, setDiscussionFormat] = useState("statements");
   const [showExportModal, setShowExportModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [meetings, setMeetings] = useState([]);
   const messagesEndRef = useRef(null);
+
+  const loadMeetings = async () => {
+    const all = await base44.entities.Conversation.filter({ type: "meeting" });
+    setMeetings(all.sort((a, b) => new Date(b.created_date) - new Date(a.created_date)));
+  };
 
   useEffect(() => { init(); }, []);
   useEffect(() => {
@@ -219,6 +227,7 @@ export default function BoardChat() {
     setConversation(convo);
     const msgs = await base44.entities.ChatMessage.filter({ conversation_id: convo.id });
     setMessages(msgs.sort((a, b) => new Date(a.created_date) - new Date(b.created_date)));
+    await loadMeetings();
     setInitializing(false);
   };
 
@@ -380,13 +389,33 @@ export default function BoardChat() {
     setActiveAgents([]);
     setDecisions([]);
     setMessages([]);
-    // Create a fresh conversation
     const newConvo = await base44.entities.Conversation.create({
       type: "meeting",
       topic: "board_room_discussion",
       participants: agents.map(ag => ag.id),
     });
     setConversation(newConvo);
+    await loadMeetings();
+  };
+
+  const handleEndMeeting = async () => {
+    setPhase("done");
+    setCurrentSpeaker(null);
+    setLoading(false);
+    if (pendingTopic && conversation) {
+      await base44.entities.Conversation.update(conversation.id, { topic: pendingTopic });
+      await loadMeetings();
+    }
+  };
+
+  const handleSelectMeeting = async (meeting) => {
+    setConversation(meeting);
+    const msgs = await base44.entities.ChatMessage.filter({ conversation_id: meeting.id });
+    setMessages(msgs.sort((a, b) => new Date(a.created_date) - new Date(b.created_date)));
+    setPhase("done");
+    setDecisions([]);
+    setActiveAgents([]);
+    setPendingTopic(meeting.topic !== "board_room_discussion" ? meeting.topic : "");
   };
 
   const handleSend = () => {
@@ -406,7 +435,18 @@ export default function BoardChat() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-56px)] md:h-screen">
+    <div className="flex h-[calc(100dvh-56px)] md:h-screen overflow-hidden">
+      <MeetingSidebar
+        meetings={meetings}
+        currentId={conversation?.id}
+        onSelect={handleSelectMeeting}
+        onNewMeeting={handleNewSession}
+        onEndMeeting={handleEndMeeting}
+        phase={phase}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(o => !o)}
+      />
+      <div className="flex flex-col flex-1 min-w-0">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border bg-card/50 shrink-0">
         <div className="flex items-center justify-between">
@@ -557,6 +597,7 @@ export default function BoardChat() {
           onClose={() => setShowExportModal(false)}
         />
       )}
+      </div>
     </div>
   );
 }
