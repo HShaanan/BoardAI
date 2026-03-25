@@ -7,14 +7,27 @@ import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
 import FeedbackButtons from "../components/shared/FeedbackButtons";
 
 // ── Message Bubble ──────────────────────────────────────
+function MessageTimestamp({ ts }) {
+  if (!ts) return null;
+  const date = new Date(ts);
+  const formatted = date.toLocaleString(undefined, {
+    month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  });
+  return <span className="text-[10px] text-muted-foreground/60 mt-1 block">{formatted}</span>;
+}
+
 function MessageBubble({ message, agentMap }) {
   const isUser = message.role === "user";
 
   if (isUser) {
     return (
       <div className="flex justify-end mb-6">
-        <div className="max-w-[72%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-3">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+        <div className="flex flex-col items-end gap-0.5">
+          <div className="max-w-[72%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-3">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+          </div>
+          <MessageTimestamp ts={message.ts} />
         </div>
       </div>
     );
@@ -49,6 +62,7 @@ function MessageBubble({ message, agentMap }) {
           agentRoleKey={message.agent_role_key}
           agentTitle={agent?.title}
         />
+        <MessageTimestamp ts={message.ts} />
       </div>
     </div>
   );

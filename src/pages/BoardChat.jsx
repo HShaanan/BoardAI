@@ -10,6 +10,16 @@ import ReactMarkdown from "react-markdown";
 import FeedbackButtons from "../components/shared/FeedbackButtons";
 
 // ── Message Bubble ──────────────────────────────────────
+function MessageTimestamp({ ts }) {
+  if (!ts) return null;
+  const date = new Date(ts);
+  const formatted = date.toLocaleString(undefined, {
+    month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  });
+  return <span className="text-[10px] text-muted-foreground/60 mt-1 block">{formatted}</span>;
+}
+
 function MessageBubble({ message, agentMap }) {
   const isUser = message.role === "user";
   const isFacilitator = !isUser && message.agent_role_key === "facilitator";
@@ -18,8 +28,11 @@ function MessageBubble({ message, agentMap }) {
   if (isUser) {
     return (
       <div className="flex justify-end mb-6">
-        <div className="max-w-[70%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-3">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+        <div className="flex flex-col items-end gap-0.5">
+          <div className="max-w-[70%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-3">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+          </div>
+          <MessageTimestamp ts={message.ts} />
         </div>
       </div>
     );
@@ -36,6 +49,7 @@ function MessageBubble({ message, agentMap }) {
           <div className="prose prose-sm prose-invert max-w-none text-foreground/90 leading-relaxed">
             <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
+          <MessageTimestamp ts={message.ts} />
         </div>
       </div>
     );
@@ -63,6 +77,7 @@ function MessageBubble({ message, agentMap }) {
           agentRoleKey={message.agent_role_key}
           agentTitle={agent?.title}
         />
+        <MessageTimestamp ts={message.ts} />
       </div>
     </div>
   );
