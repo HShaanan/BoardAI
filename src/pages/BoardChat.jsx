@@ -396,6 +396,7 @@ export default function BoardChat() {
     });
     setConversation(newConvo);
     await loadMeetings();
+    setSidebarOpen(false);
   };
 
   const handleEndMeeting = async () => {
@@ -416,6 +417,7 @@ export default function BoardChat() {
     setDecisions([]);
     setActiveAgents([]);
     setPendingTopic(meeting.topic !== "board_room_discussion" ? meeting.topic : "");
+    setSidebarOpen(false);
   };
 
   const handleSend = () => {
