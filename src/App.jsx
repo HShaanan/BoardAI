@@ -16,7 +16,7 @@ import Projects from './pages/Projects';
 import Brain from './pages/Brain';
 import Core from './pages/Core';
 import Outputs from './pages/Outputs';
-import Memory from './pages/Memory';
+import Memory from './pages/Memory.jsx';
 import SettingsPage from './pages/SettingsPage';
 
 import Tasks from './pages/Tasks';
