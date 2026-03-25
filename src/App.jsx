@@ -21,6 +21,7 @@ import SettingsPage from './pages/SettingsPage';
 
 import Tasks from './pages/Tasks';
 import ChatHistory from './pages/ChatHistory';
+import MyAgentSettings from './pages/MyAgentSettings';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -64,6 +65,7 @@ const AuthenticatedApp = () => {
           <Route path="/board-chat" element={<Chat />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/chat-history" element={<ChatHistory />} />
+          <Route path="/my-agents" element={<MyAgentSettings />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />
       </Routes>
