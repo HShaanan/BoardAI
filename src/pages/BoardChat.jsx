@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Send, Loader2, Sparkles, Users, Check, X, MessageSquarePlus, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { Send, Loader2, Sparkles, Users, Check, X, MessageSquarePlus, ChevronDown, ChevronUp, Download, FileText } from "lucide-react";
+import ExportOutputModal from "../components/boardchat/ExportOutputModal";
 import { exportConversationToKnowledge } from "../lib/exportToKnowledge";
 import { Button } from "@/components/ui/button";
 import AgentAvatar from "../components/shared/AgentAvatar";
@@ -182,11 +183,12 @@ export default function BoardChat() {
   const [core, setCore] = useState(null);
   const [currentSpeaker, setCurrentSpeaker] = useState(null);
   const [decisions, setDecisions] = useState([]);
-  const [phase, setPhase] = useState("idle"); // idle | planning | confirming | running | done
+  const [phase, setPhase] = useState("idle");
   const [pendingTopic, setPendingTopic] = useState("");
   const [recommendation, setRecommendation] = useState(null);
-  const [activeAgents, setActiveAgents] = useState([]); // confirmed participants
+  const [activeAgents, setActiveAgents] = useState([]);
   const [discussionFormat, setDiscussionFormat] = useState("statements");
+  const [showExportModal, setShowExportModal] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => { init(); }, []);
@@ -226,7 +228,6 @@ export default function BoardChat() {
     return msg;
   };
 
-  // Phase 1: User submits topic → facilitator recommends
   const handleTopicSubmit = async () => {
     if (!input.trim() || loading) return;
     const topic = input.trim();
@@ -243,26 +244,7 @@ export default function BoardChat() {
     const coreCtx = core ? `חברה: ${core.company_name}\nמשימה: ${core.mission}\nחזון: ${core.vision}` : "";
 
     const rec = await base44.integrations.Core.InvokeLLM({
-      prompt: `אתה מנחה ישיבת דירקטוריון מקצועי.
-
-נושא הדיון: "${topic}"
-${coreCtx}
-
-הסוכנים הזמינים:
-${agentsList}
-
-בצע תיאום ציפיות:
-1. זהה 3-5 סוכנים הכי רלוונטיים ונמק בקצרה
-2. המלץ על פורמט: "statements" (כל אחד מביע עמדה) או "debate" (דיון חי בין הסוכנים)
-3. כתוב הודעה קצרה ומקצועית למשתמש
-
-החזר JSON בלבד:
-{
-  "facilitator_message": "הודעה למשתמש בעברית",
-  "selected_agents": [{"role_key": "...", "reason": "נימוק קצר"}],
-  "suggested_format": "statements|debate",
-  "format_reason": "למה מומלץ פורמט זה"
-}`,
+      prompt: `אתה מנחה ישיבת דירקטוריון מקצועי.\n\nנושא הדיון: "${topic}"\n${coreCtx}\n\nהסוכנים הזמינים:\n${agentsList}\n\nבצע תיאום ציפיות:\n1. זהה 3-5 סוכנים הכי רלוונטיים ונמק בקצרה\n2. המלץ על פורמט: "statements" (כל אחד מביע עמדה) או "debate" (דיון חי בין הסוכנים)\n3. כתוב הודעה קצרה ומקצועית למשתמש\n\nהחזר JSON בלבד:\n{\n  "facilitator_message": "הודעה למשתמש בעברית",\n  "selected_agents": [{"role_key": "...", "reason": "נימוק קצר"}],\n  "suggested_format": "statements|debate",\n  "format_reason": "למה מומלץ פורמט זה"\n}`,
       response_json_schema: {
         type: "object",
         properties: {
@@ -285,7 +267,6 @@ ${agentsList}
     setPhase("confirming");
   };
 
-  // Phase 2: User confirms participants + format → run discussion
   const handleConfirm = async (selectedAgents, format) => {
     setActiveAgents(selectedAgents);
     setDiscussionFormat(format);
@@ -310,82 +291,56 @@ ${agentsList}
     }
   };
 
-  // Phase 3: Run the actual discussion
+  const buildAgentPrompt = (agent, topic, coreCtx, history, mode, knowledgeCtx = "") => {
+    const histCtx = history.length > 0
+      ? `\nמה שנאמר עד כה:\n${history.map(h => `${h.agent}: ${h.content}`).join("\n\n")}`
+      : "";
+    return `אתה ${agent.title} (${agent.title_he}).\nאחריות: ${agent.responsibilities}\nאישיות: ${agent.personality_traits}\nסגנון: ${agent.communication_style}\nיצירתיות: ${agent.creativity_level}/10 | פירוטיות: ${agent.verbosity_level}/10\n\n${coreCtx}\n${knowledgeCtx}\n${histCtx}\n\nנושא: "${topic}"\n\n${mode === "debate" ? "הגב לדברים שנאמרו. אפשר להסכים, לחלוק, לחדד. היה ממוקד ותורם לדיון." : "הבע את עמדתך המקצועית. תן המלצה ברורה. עשה שימוש בנתונים ממאגר הידע אםרלוונטים."}\nהגב בשפה שבה נוסח הנושא.`;
+  };
+
   const runDiscussion = async (selectedAgents, format, topic) => {
     const coreCtx = core ? `חברה: ${core.company_name}\nמשימה: ${core.mission}\nחזון: ${core.vision}\nגיידליינס: ${core.brand_guidelines}` : "";
-
-    // Inject knowledge base into all agent prompts
     const brainEntries = await base44.entities.BrainEntry.list("-created_date", 8);
     const knowledgeCtx = brainEntries.length > 0
-      ? `\n\nמאגר ידע ארגוני (ישיבות והחלטות קודמות):\n${brainEntries.map(e => `### ${e.title}\n${e.content?.slice(0, 500)}`).join("\n---\n")}`
+      ? `\n\nמאגר ידע ארגוני:\n${brainEntries.map(e => `### ${e.title}\n${e.content?.slice(0, 500)}`).join("\n---\n")}`
       : "";
 
     if (format === "statements") {
-      // Each agent speaks once independently
       for (const agent of selectedAgents) {
         setCurrentSpeaker(agent.title);
-        await addMsg(conversation, {
-          role: "agent",
-          content: `${agent.title}, מה עמדתך?`,
-          agent_role_key: "facilitator"
-        });
-
+        await addMsg(conversation, { role: "agent", content: `${agent.title}, מה עמדתך?`, agent_role_key: "facilitator" });
         const resp = await base44.integrations.Core.InvokeLLM({
           prompt: buildAgentPrompt(agent, topic, coreCtx, [], "statement", knowledgeCtx)
         });
-        await addMsg(conversation, {
-          role: "agent", content: resp,
-          agent_id: agent.id, agent_role_key: agent.role_key
-        });
+        await addMsg(conversation, { role: "agent", content: resp, agent_id: agent.id, agent_role_key: agent.role_key });
       }
     } else {
-      // Debate: agents respond to each other
       const discussionHistory = [];
       for (const agent of selectedAgents) {
         setCurrentSpeaker(agent.title);
         await addMsg(conversation, {
           role: "agent",
-          content: discussionHistory.length === 0
-            ? `${agent.title}, פתח את הדיון.`
-            : `${agent.title}, מה תגובתך לאמור עד כה?`,
+          content: discussionHistory.length === 0 ? `${agent.title}, פתח את הדיון.` : `${agent.title}, מה תגובתך לאמור עד כה?`,
           agent_role_key: "facilitator"
         });
-
         const resp = await base44.integrations.Core.InvokeLLM({
           prompt: buildAgentPrompt(agent, topic, coreCtx, discussionHistory, "debate", knowledgeCtx)
         });
         discussionHistory.push({ agent: agent.title, content: resp });
-        await addMsg(conversation, {
-          role: "agent", content: resp,
-          agent_id: agent.id, agent_role_key: agent.role_key
-        });
+        await addMsg(conversation, { role: "agent", content: resp, agent_id: agent.id, agent_role_key: agent.role_key });
       }
     }
 
-    // Extract decisions
     setCurrentSpeaker("מסכם החלטות...");
     const allAgentNames = selectedAgents.map(a => a.role_key).join(", ");
     const decisionsResult = await base44.integrations.Core.InvokeLLM({
-      prompt: `סכם את הדיון שהתקיים בנושא: "${topic}" וחלץ החלטות מעשיות.
-סוכנים שהשתתפו: ${selectedAgents.map(a => a.title).join(", ")}
-
-לכל החלטה: מה לעשות, מי אחראי (role_key מ: ${allAgentNames}), עדיפות.
-
-החזר JSON:
-{"decisions": [{"directive_text": "...","agent_role_key": "...","priority": "low|medium|high|critical"}]}`,
+      prompt: `סכם את הדיון שהתקיים בנושא: "${topic}" וחלץ החלטות מעשיות.\nסוכנים שהשתתפו: ${selectedAgents.map(a => a.title).join(", ")}\n\nלכל החלטה: מה לעשות, מי אחראי (role_key מ: ${allAgentNames}), עדיפות.\n\nהחזר JSON:\n{"decisions": [{"directive_text": "...","agent_role_key": "...","priority": "low|medium|high|critical"}]}`,
       response_json_schema: {
         type: "object",
         properties: {
           decisions: {
             type: "array",
-            items: {
-              type: "object",
-              properties: {
-                directive_text: { type: "string" },
-                agent_role_key: { type: "string" },
-                priority: { type: "string" }
-              }
-            }
+            items: { type: "object", properties: { directive_text: { type: "string" }, agent_role_key: { type: "string" }, priority: { type: "string" } } }
           }
         }
       }
@@ -403,7 +358,6 @@ ${agentsList}
     setLoading(false);
     setPhase("done");
 
-    // Auto-export to knowledge base
     const allMsgs = await base44.entities.ChatMessage.filter({ conversation_id: conversation.id });
     exportConversationToKnowledge({
       title: `ישיבת דירקטוריון: ${topic}`,
@@ -412,7 +366,6 @@ ${agentsList}
     });
   };
 
-  // User interrupts / adds comment mid-discussion
   const handleInterject = async () => {
     if (!input.trim() || loading) return;
     const comment = input.trim();
@@ -420,7 +373,6 @@ ${agentsList}
     await addMsg(conversation, { role: "board", content: comment });
   };
 
-  // New discussion
   const handleNewSession = () => {
     setPhase("idle");
     setPendingTopic("");
@@ -431,30 +383,6 @@ ${agentsList}
   const handleSend = () => {
     if (phase === "idle" || phase === "done") handleTopicSubmit();
     else if (phase === "running") handleInterject();
-  };
-
-  const buildAgentPrompt = (agent, topic, coreCtx, history, mode, knowledgeCtx = "") => {
-    const histCtx = history.length > 0
-      ? `\nמה שנאמר עד כה:\n${history.map(h => `${h.agent}: ${h.content}`).join("\n\n")}`
-      : "";
-    return `אתה ${agent.title} (${agent.title_he}).
-אחריות: ${agent.responsibilities}
-אישיות: ${agent.personality_traits}
-סגנון: ${agent.communication_style}
-יצירתיות: ${agent.creativity_level}/10 | פירוטיות: ${agent.verbosity_level}/10
-
-${coreCtx}
-${knowledgeCtx}
-${histCtx}
-
-נושא: "${topic}"
-
-${
-  mode === "debate"
-    ? "הגב לדברים שנאמרו. אפשר להסכים, לחלוק, לחדד. היה ממוקד ותורם לדיון."
-    : "הבע את עמדתך המקצועית. תן המלצה ברורה. עשה שימוש בנתונים ממאגר הידע אםרלוונטים."
-}
-הגב בשפה שבה נוסח הנושא.`;
   };
 
   if (initializing) {
@@ -501,6 +429,9 @@ ${
             )}
             {phase === "done" && (
               <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowExportModal(true)} className="text-xs h-7 rounded-lg gap-1">
+                  <FileText className="w-3 h-3" /> סיכום Output
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => exportConversationToKnowledge({
                   title: `ישיבת דירקטוריון: ${pendingTopic}`,
                   messages,
@@ -606,6 +537,16 @@ ${
             </p>
           )}
         </div>
+      )}
+
+      {/* Export Output Modal */}
+      {showExportModal && (
+        <ExportOutputModal
+          topic={pendingTopic}
+          activeAgents={activeAgents}
+          decisions={decisions}
+          onClose={() => setShowExportModal(false)}
+        />
       )}
     </div>
   );
