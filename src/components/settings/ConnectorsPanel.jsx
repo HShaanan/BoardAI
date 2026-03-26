@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 const CONNECTORS = [
   { id: "69c5354290df2e0f2594ae79", name: "Gmail", icon: "✉️", desc: "שליחת מיילים ותקשורת חיצונית" },
-  { id: "69c5359f73a994251d8284c2", name: "Google Calendar", icon: "📅", desc: "תזמון משימות ודדליינים" },
+  { id: "69c552746adfdb1e590072b0", name: "Google Calendar", icon: "📅", desc: "תזמון משימות ודדליינים" },
   { id: "69c535acbbb61e4f6d471fe8", name: "Google Sheets", icon: "📊", desc: "דוחות ותיעוד נתונים" },
   { id: "69c53a79bbb61e4f6d472163", name: "ClickUp", icon: "✅", desc: "ניהול פרויקטים ומשימות" },
   { id: "69c53ba1decfe0270ace1dd1", name: "Slack", icon: "💬", desc: "תקשורת צוות ועדכונים" },
