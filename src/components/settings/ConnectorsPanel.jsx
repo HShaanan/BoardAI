@@ -17,12 +17,8 @@ function ConnectorRow({ connector }) {
   const [loading, setLoading] = useState(false);
 
   const checkConnection = async () => {
-    try {
-      await base44.functions.invoke("checkConnectorStatus", { connectorId: connector.id });
-      setConnected(true);
-    } catch {
-      setConnected(false);
-    }
+    const res = await base44.functions.invoke("checkConnectorStatus", { connectorId: connector.id });
+    setConnected(res.data?.connected === true);
   };
 
   useEffect(() => { checkConnection(); }, []);
