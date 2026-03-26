@@ -3,50 +3,32 @@ import { base44 } from "@/api/base44Client";
 import { ArrowUp, Loader2, Bot, Plus, MessageSquare, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
-function buildSystemPrompt(company, agents) {
-  const companyInfo = company
-    ? `אתה עוזר AI חכם של החברה "${company.company_name}". תחום: ${company.industry || "לא צוין"}. מיסיון: ${company.mission || "לא צוין"}. יעדים: ${company.business_goals || "לא צוין"}.`
-    : 'אתה עוזר AI חכם של מנכ"ל.';
-  const agentList = agents.length
-    ? `\n\nהסוכנים הזמינים: ${agents.map(a => a.title_he || a.title).join(", ")}.`
-    : "";
-  return companyInfo + agentList + "\n\nענה בעברית, בצורה ממוקדת ומקצועית.";
-}
+const AGENT_NAME = "boss_ai";
+const STORAGE_KEY = "boss_ai_conversations";
 
-const STORAGE_KEY = "boss_ai_chats";
-
-function loadChats() {
+function loadStoredConvos() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
 }
-function saveChats(chats) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+function saveStoredConvos(convos) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(convos));
 }
 
 export default function Dashboard() {
-  const [chats, setChats] = useState(() => loadChats());
-  const [activeChatId, setActiveChatId] = useState(null);
+  // storedConvos: [{ id, title, createdAt }] — metadata only
+  const [storedConvos, setStoredConvos] = useState(() => loadStoredConvos());
+  const [activeConvoId, setActiveConvoId] = useState(null);
+  const [activeConvo, setActiveConvo] = useState(null); // full convo object from SDK
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [company, setCompany] = useState(null);
-  const [agents, setAgents] = useState([]);
+  const [loadingConvo, setLoadingConvo] = useState(false);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
-
-  const activeChat = chats.find(c => c.id === activeChatId) || null;
-
-  useEffect(() => {
-    Promise.all([
-      base44.entities.CompanyCore.list("-created_date", 1),
-      base44.entities.Agent.list(),
-    ]).then(([c, a]) => {
-      if (c[0]) setCompany(c[0]);
-      setAgents(a);
-    });
-  }, []);
+  const unsubRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeChat?.messages]);
+  }, [messages]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -55,17 +37,43 @@ export default function Dashboard() {
     }
   }, [input]);
 
-  const createNewChat = () => {
-    setActiveChatId(null);
+  useEffect(() => {
+    return () => { if (unsubRef.current) unsubRef.current(); };
+  }, []);
+
+  const subscribeToConvo = (convoId) => {
+    if (unsubRef.current) unsubRef.current();
+    const unsub = base44.agents.subscribeToConversation(convoId, (data) => {
+      setMessages(data.messages || []);
+    });
+    unsubRef.current = unsub;
+  };
+
+  const openConversation = async (meta) => {
+    setLoadingConvo(true);
+    setActiveConvoId(meta.id);
+    setMessages([]);
+    const convo = await base44.agents.getConversation(meta.id);
+    setActiveConvo(convo);
+    setMessages(convo.messages || []);
+    subscribeToConvo(meta.id);
+    setLoadingConvo(false);
+  };
+
+  const createNewChat = async () => {
+    setActiveConvoId(null);
+    setActiveConvo(null);
+    setMessages([]);
+    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
     setInput("");
   };
 
-  const deleteChat = (id, e) => {
+  const deleteConvo = (id, e) => {
     e.stopPropagation();
-    const updated = chats.filter(c => c.id !== id);
-    setChats(updated);
-    saveChats(updated);
-    if (activeChatId === id) setActiveChatId(null);
+    const updated = storedConvos.filter(c => c.id !== id);
+    setStoredConvos(updated);
+    saveStoredConvos(updated);
+    if (activeConvoId === id) createNewChat();
   };
 
   const handleSend = async () => {
@@ -74,45 +82,24 @@ export default function Dashboard() {
     setInput("");
     setLoading(true);
 
-    let chatId = activeChatId;
-    let currentChats = chats;
+    let convo = activeConvo;
 
-    if (!chatId) {
-      const newChat = {
-        id: Date.now().toString(),
-        title: text.slice(0, 40),
-        messages: [],
-        createdAt: new Date().toISOString(),
-      };
-      currentChats = [newChat, ...chats];
-      setChats(currentChats);
-      saveChats(currentChats);
-      chatId = newChat.id;
-      setActiveChatId(chatId);
+    if (!convo) {
+      convo = await base44.agents.createConversation({
+        agent_name: AGENT_NAME,
+        metadata: { title: text.slice(0, 50) }
+      });
+      setActiveConvo(convo);
+      setActiveConvoId(convo.id);
+      subscribeToConvo(convo.id);
+
+      const meta = { id: convo.id, title: text.slice(0, 50), createdAt: new Date().toISOString() };
+      const updated = [meta, ...storedConvos];
+      setStoredConvos(updated);
+      saveStoredConvos(updated);
     }
 
-    const chat = currentChats.find(c => c.id === chatId);
-    const userMsg = { role: "user", content: text };
-    const updatedMessages = [...chat.messages, userMsg];
-
-    const updatedChats = currentChats.map(c =>
-      c.id === chatId ? { ...c, messages: updatedMessages } : c
-    );
-    setChats(updatedChats);
-    saveChats(updatedChats);
-
-    const history = updatedMessages.map(m => `${m.role === "user" ? "משתמש" : "עוזר"}: ${m.content}`).join("\n");
-    const prompt = `${buildSystemPrompt(company, agents)}\n\n--- היסטוריית שיחה ---\n${history}\n\nענה רק על ההודעה האחרונה.`;
-
-    const result = await base44.integrations.Core.InvokeLLM({ prompt });
-
-    const assistantMsg = { role: "assistant", content: result };
-    const finalMessages = [...updatedMessages, assistantMsg];
-    const finalChats = updatedChats.map(c =>
-      c.id === chatId ? { ...c, messages: finalMessages } : c
-    );
-    setChats(finalChats);
-    saveChats(finalChats);
+    await base44.agents.addMessage(convo, { role: "user", content: text });
     setLoading(false);
   };
 
@@ -123,23 +110,17 @@ export default function Dashboard() {
     }
   };
 
-  const groupedChats = {
-    today: chats.filter(c => {
-      const d = new Date(c.createdAt);
-      const now = new Date();
-      return d.toDateString() === now.toDateString();
-    }),
-    older: chats.filter(c => {
-      const d = new Date(c.createdAt);
-      const now = new Date();
-      return d.toDateString() !== now.toDateString();
-    }),
+  const isTyping = messages.length > 0 && messages[messages.length - 1]?.role === "user" && loading;
+
+  const groupedConvos = {
+    today: storedConvos.filter(c => new Date(c.createdAt).toDateString() === new Date().toDateString()),
+    older: storedConvos.filter(c => new Date(c.createdAt).toDateString() !== new Date().toDateString()),
   };
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Chat History Sidebar */}
-      <div className="w-64 shrink-0 border-l border-border bg-card flex flex-col hidden md:flex">
+      {/* Sidebar */}
+      <div className="w-64 shrink-0 border-l border-border bg-card flex-col hidden md:flex">
         <div className="p-3 border-b border-border">
           <button
             onClick={createNewChat}
@@ -151,71 +132,72 @@ export default function Dashboard() {
         </div>
 
         <div className="flex-1 overflow-y-auto py-2 px-2 space-y-4">
-          {groupedChats.today.length > 0 && (
+          {groupedConvos.today.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase px-2 mb-1">היום</p>
               <div className="space-y-0.5">
-                {groupedChats.today.map(c => (
+                {groupedConvos.today.map(c => (
                   <button
                     key={c.id}
-                    onClick={() => setActiveChatId(c.id)}
+                    onClick={() => openConversation(c)}
                     className={`w-full group flex items-center gap-2 px-3 py-2 rounded-lg text-right text-sm transition-colors ${
-                      activeChatId === c.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                      activeConvoId === c.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
                     }`}
                   >
                     <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-50" />
                     <span className="flex-1 truncate">{c.title}</span>
                     <Trash2
                       className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
-                      onClick={(e) => deleteChat(c.id, e)}
+                      onClick={(e) => deleteConvo(c.id, e)}
                     />
                   </button>
                 ))}
               </div>
             </div>
           )}
-          {groupedChats.older.length > 0 && (
+          {groupedConvos.older.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase px-2 mb-1">קודם</p>
               <div className="space-y-0.5">
-                {groupedChats.older.map(c => (
+                {groupedConvos.older.map(c => (
                   <button
                     key={c.id}
-                    onClick={() => setActiveChatId(c.id)}
+                    onClick={() => openConversation(c)}
                     className={`w-full group flex items-center gap-2 px-3 py-2 rounded-lg text-right text-sm transition-colors ${
-                      activeChatId === c.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                      activeConvoId === c.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
                     }`}
                   >
                     <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-50" />
                     <span className="flex-1 truncate">{c.title}</span>
                     <Trash2
                       className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
-                      onClick={(e) => deleteChat(c.id, e)}
+                      onClick={(e) => deleteConvo(c.id, e)}
                     />
                   </button>
                 ))}
               </div>
             </div>
           )}
-          {chats.length === 0 && (
+          {storedConvos.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-8">אין שיחות עדיין</p>
           )}
         </div>
       </div>
 
-      {/* Main Chat Area */}
+      {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {!activeChat ? (
+        {loadingConvo ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : messages.length === 0 && !activeConvo ? (
           /* Empty state */
           <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
               <Bot className="w-6 h-6 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              {company ? `שלום, ${company.company_name}` : "Boss AI"}
-            </h1>
-            <p className="text-muted-foreground text-sm mb-8">שאל שאלה, בקש ניתוח, או תן הנחיה לצוות</p>
-
+            <h1 className="text-2xl font-bold text-foreground mb-2">Boss AI</h1>
+            <p className="text-muted-foreground text-sm mb-8">מנהל הסוכנים שלך — שאל, הנחה, נתח</p>
             <div className="w-full max-w-2xl">
               <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
                 <textarea
@@ -245,20 +227,16 @@ export default function Dashboard() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto">
               <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-                {activeChat.messages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                {messages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start gap-3"}`}>
                     {msg.role === "assistant" && (
-                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1 ml-3">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
                         <Bot className="w-3.5 h-3.5 text-primary" />
                       </div>
                     )}
-                    <div
-                      className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                        msg.role === "user"
-                          ? "bg-secondary text-foreground rounded-bl-sm"
-                          : "text-foreground"
-                      }`}
-                    >
+                    <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                      msg.role === "user" ? "bg-secondary text-foreground rounded-bl-sm" : "text-foreground"
+                    }`}>
                       {msg.role === "assistant" ? (
                         <div className="prose prose-sm max-w-none text-foreground">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -269,14 +247,14 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
-                {loading && (
+                {(isTyping || (loading && activeConvo)) && (
                   <div className="flex justify-start gap-3">
                     <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
                       <Bot className="w-3.5 h-3.5 text-primary" />
                     </div>
-                    <div className="px-4 py-3 rounded-2xl text-sm text-muted-foreground flex items-center gap-2">
+                    <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      חושב...
+                      Boss AI חושב...
                     </div>
                   </div>
                 )}
