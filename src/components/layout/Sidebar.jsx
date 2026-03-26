@@ -30,17 +30,17 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 sticky top-0",
-        collapsed ? "w-16" : "w-60"
+        "h-screen bg-sidebar border-l border-sidebar-border flex flex-col transition-all duration-300 sticky top-0",
+        collapsed ? "w-14" : "w-56"
       )}
     >
       {/* Logo */}
-      <div className="p-4 flex items-center gap-3 border-b border-sidebar-border min-h-[64px]">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">AI</span>
+      <div className="px-4 py-3 flex items-center gap-2.5 border-b border-sidebar-border min-h-[56px]">
+        <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
+          <span className="text-primary-foreground font-bold text-xs">AI</span>
         </div>
         {!collapsed && (
-          <span className="font-bold text-foreground text-lg tracking-tight whitespace-nowrap">
+          <span className="font-semibold text-foreground text-base tracking-tight whitespace-nowrap">
             Boss AI
           </span>
         )}
@@ -50,7 +50,7 @@ export default function Sidebar() {
       <CompanySwitcher collapsed={collapsed} />
 
       {/* Nav */}
-      <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const isActive = location.pathname === item.path ||
             (item.path !== "/" && location.pathname.startsWith(item.path));
@@ -59,13 +59,13 @@ export default function Sidebar() {
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                "flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-150",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-primary"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                  ? "bg-sidebar-accent text-foreground font-semibold"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
               )}
             >
-              <item.icon className={cn("w-5 h-5 shrink-0", isActive && "text-primary")} />
+              <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary" : "opacity-60")} />
               {!collapsed && <span className="truncate">{item.label_he}</span>}
             </Link>
           );
@@ -73,7 +73,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Notifications */}
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-1">
         <NotificationBell collapsed={collapsed} />
       </div>
 
