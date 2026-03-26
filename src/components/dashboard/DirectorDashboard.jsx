@@ -1,4 +1,5 @@
-import { Calendar, Target, TrendingUp, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Target, TrendingUp, AlertCircle, CheckCircle2 } from "lucide-react";
+import CalendarWidget from "./CalendarWidget";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
@@ -106,6 +107,9 @@ export default function DirectorDashboard({ agents, tasks, projects }) {
           </div>
         </div>
       )}
+
+      {/* יומן */}
+      <CalendarWidget />
 
       {/* סוכנים פעילים */}
       <div className="bg-card rounded-xl border border-border p-6">

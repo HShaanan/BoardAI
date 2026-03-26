@@ -1,0 +1,57 @@
+{
+  "name": "CalendarEvent",
+  "type": "object",
+  "properties": {
+    "google_event_id": {
+      "type": "string",
+      "title": "Google Event ID"
+    },
+    "title": {
+      "type": "string",
+      "title": "Title"
+    },
+    "description": {
+      "type": "string",
+      "title": "Description"
+    },
+    "start_time": {
+      "type": "string",
+      "title": "Start Time",
+      "format": "date-time"
+    },
+    "end_time": {
+      "type": "string",
+      "title": "End Time",
+      "format": "date-time"
+    },
+    "location": {
+      "type": "string",
+      "title": "Location"
+    },
+    "category": {
+      "type": "string",
+      "title": "Category",
+      "enum": [
+        "meeting",
+        "deadline",
+        "task",
+        "personal",
+        "review",
+        "other"
+      ]
+    },
+    "user_email": {
+      "type": "string",
+      "title": "User Email"
+    },
+    "calendar_link": {
+      "type": "string",
+      "title": "Calendar Link"
+    }
+  },
+  "required": [
+    "title",
+    "start_time",
+    "category"
+  ]
+}
