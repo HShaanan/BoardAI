@@ -19,7 +19,7 @@ function AgentMentionPopup({ agents, activeAgentKeys, query, onToggle, onClose }
   const filtered = agents.filter(a =>
     a.title.toLowerCase().includes(query.toLowerCase()) ||
     (a.title_he || "").includes(query)
-  ).slice(0, 8);
+  );
 
   if (filtered.length === 0) return null;
 
@@ -31,7 +31,7 @@ function AgentMentionPopup({ agents, activeAgentKeys, query, onToggle, onClose }
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="max-h-52 overflow-y-auto">
+      <div className="max-h-64 overflow-y-auto">
         {filtered.map(a => {
           const isActive = activeAgentKeys.includes(a.role_key);
           return (
@@ -106,29 +106,54 @@ export default function Dashboard() {
   };
 
   const rebuildMessages = (convosMap) => {
-    const all = [];
-    Object.entries(convosMap).forEach(([agentKey, convo]) => {
-      if (!convo?.messages) return;
-      convo.messages.forEach(m => {
-        all.push({
-          id: `${agentKey}-${m.id || Math.random()}`,
-          role: m.role === "assistant" ? "assistant" : "user",
+    // Use boss convo as the reference for turn structure
+    const bossConvo = convosMap[BOSS_AGENT];
+    if (!bossConvo?.messages?.length) {
+      setMessages([]);
+      return;
+    }
+
+    const result = [];
+    const bossMessages = bossConvo.messages;
+
+    // Iterate through boss convo messages in order
+    // Odd indices = user, even indices = assistant (or vice versa)
+    // Boss messages alternate: user, assistant, user, assistant...
+    for (let i = 0; i < bossMessages.length; i++) {
+      const m = bossMessages[i];
+      if (m.role === 'user') {
+        // Add user message once
+        result.push({
+          id: `user-turn-${i}`,
+          role: 'user',
           content: m.content,
-          agentKey: m.role === "assistant" ? agentKey : null,
-          createdAt: m.created_date || m.id,
+          agentKey: null,
         });
-      });
-    });
-    // Dedupe user messages
-    const seen = new Set();
-    const deduped = all.filter(m => {
-      if (m.role !== "user") return true;
-      if (seen.has(m.content)) return false;
-      seen.add(m.content);
-      return true;
-    });
-    deduped.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
-    setMessages(deduped);
+      } else if (m.role === 'assistant') {
+        // Add boss AI response
+        result.push({
+          id: `${BOSS_AGENT}-${i}`,
+          role: 'assistant',
+          content: m.content,
+          agentKey: BOSS_AGENT,
+        });
+        // Add other agents' responses at the same turn
+        Object.entries(convosMap).forEach(([key, convo]) => {
+          if (key === BOSS_AGENT || !convo?.messages) return;
+          const agentMsg = convo.messages[i];
+          if (agentMsg?.role === 'assistant') {
+            result.push({
+              id: `${key}-${i}`,
+              role: 'assistant',
+              content: agentMsg.content,
+              agentKey: key,
+            });
+          }
+        });
+      }
+    }
+
+    setMessages(result);
   };
 
   const createNewChat = () => {
@@ -175,7 +200,7 @@ export default function Dashboard() {
   const toggleAgent = async (agent) => {
     const key = agent.role_key;
     if (activeAgents.find(a => a.role_key === key)) {
-      // Remove
+      // Remove agent
       setActiveAgents(prev => prev.filter(a => a.role_key !== key));
       if (unsubsRef.current[key]) { unsubsRef.current[key](); delete unsubsRef.current[key]; }
       setConvoObjects(prev => {
@@ -185,24 +210,24 @@ export default function Dashboard() {
         return updated;
       });
     } else {
-      // Add
-      setActiveAgents(prev => [...prev, agent]);
-      if (activeConvoId) {
-        // Create convo for this agent with existing thread
+      // Add agent — create convo immediately if we're in an active chat
+      const newActiveAgents = [...activeAgents, agent];
+      setActiveAgents(newActiveAgents);
+
+      if (convoObjects[BOSS_AGENT]) {
+        // We have an active boss convo — create agent convo now
         const convo = await base44.agents.createConversation({
           agent_name: key,
           metadata: { title: `שיחה עם ${agent.title_he || agent.title}` }
         });
-        setConvoObjects(prev => {
-          const updated = { ...prev, [key]: convo };
-          rebuildMessages(updated);
-          return updated;
-        });
+        const updated = { ...convoObjects, [key]: convo };
+        setConvoObjects(updated);
         subscribeAgent(key, convo.id);
+        rebuildMessages(updated);
       }
     }
     setMentionQuery(null);
-    setInput(prev => prev.replace(/[@]\S*$/, ""));
+    setInput(prev => prev.replace(/[@]\S*$/, ''));
     textareaRef.current?.focus();
   };
 
@@ -259,7 +284,7 @@ export default function Dashboard() {
     const allConvoKeys = [BOSS_AGENT, ...activeAgents.map(a => a.role_key)];
     for (const key of allConvoKeys) {
       const convo = currentConvos[key];
-      if (convo) await base44.agents.addMessage(convo, { role: "user", content: text });
+      if (convo) await base44.agents.addMessage(convo, { role: 'user', content: text });
     }
 
     setLoading(false);
