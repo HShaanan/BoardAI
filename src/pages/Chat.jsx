@@ -230,29 +230,45 @@ export default function Chat() {
   // Merge messages from multiple agent conversations, sorted by time
   const mergeMessages = (convosMap) => {
     const all = [];
+    const userMessages = new Map(); // track unique user messages by timestamp
+
     Object.entries(convosMap).forEach(([roleKey, convo]) => {
       if (!convo?.messages) return;
       convo.messages.forEach(m => {
-        all.push({
-          id: `${roleKey}-${m.id || Math.random()}`,
-          role: m.role === "assistant" ? "assistant" : "user",
-          content: m.content,
-          agent_role_key: m.role === "assistant" ? roleKey : null,
-          ts: m.created_date || m.id,
-        });
+        if (m.role === "user") {
+          // Store user message only once per timestamp
+          const ts = m.created_date || m.id;
+          if (!userMessages.has(ts)) {
+            userMessages.set(ts, {
+              id: `user-${ts}`,
+              role: "user",
+              content: m.content,
+              agent_role_key: null,
+              ts: ts,
+            });
+          }
+        } else {
+          // Assistant messages are unique per agent
+          all.push({
+            id: `${roleKey}-${m.id || Math.random()}`,
+            role: "assistant",
+            content: m.content,
+            agent_role_key: roleKey,
+            ts: m.created_date || m.id,
+          });
+        }
       });
     });
-    // Deduplicate user messages (same content sent to multiple agents)
-    const seen = new Set();
-    const deduped = all.filter(m => {
-      if (m.role !== "user") return true;
-      const key = m.content;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
+
+    // Combine user and assistant messages
+    const combined = [...Array.from(userMessages.values()), ...all];
+    // Sort strictly by timestamp
+    combined.sort((a, b) => {
+      const timeA = new Date(a.ts).getTime();
+      const timeB = new Date(b.ts).getTime();
+      return timeA - timeB;
     });
-    deduped.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
-    setMessages(deduped);
+    setMessages(combined);
   };
 
   const subscribeAgent = (roleKey, convoId) => {
@@ -349,13 +365,15 @@ export default function Chat() {
     setMentionQuery(null);
     setSending(true);
 
-    // Send to each active agent's conversation
-    for (const agent of activeAgents) {
+    // Send same message to all agents in one batch (ensures same timestamp)
+    const timestamp = new Date().toISOString();
+    const promises = activeAgents.map(agent => {
       const convo = agentConvos[agent.role_key];
-      if (!convo) continue;
+      if (!convo) return null;
       setCurrentSpeaker(agent.title);
-      await base44.agents.addMessage(convo, { role: "user", content: text });
-    }
+      return base44.agents.addMessage(convo, { role: "user", content: text, created_date: timestamp });
+    });
+    await Promise.all(promises.filter(Boolean));
 
     setCurrentSpeaker(null);
     setSending(false);
@@ -472,6 +490,13 @@ export default function Chat() {
                 <div ref={messagesEndRef} />
               </div>
             </div>
+
+            {/* Help Text */}
+            {isGroupChat && activeAgents.length > 1 && (
+              <div className="px-4 py-2 bg-primary/5 border-t border-primary/20 text-center">
+                <p className="text-xs text-primary/70">💡 הסוכנים יכולים לשמוע אחד את השני — תן להם להתכתב בטבעיות</p>
+              </div>
+            )}
 
             {/* Input */}
             <div className="px-4 pb-4 pt-2 max-w-2xl mx-auto w-full">
