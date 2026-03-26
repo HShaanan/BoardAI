@@ -188,6 +188,7 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState(null);
+  const [isGroupChat, setIsGroupChat] = useState(false); // group meeting mode
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [mentionQuery, setMentionQuery] = useState(null);
   const messagesEndRef = useRef(null);
@@ -274,6 +275,7 @@ export default function Chat() {
     setActiveAgents([agent]);
     setMessages([]);
     setAgentConvos({});
+    setIsGroupChat(false);
     unsubscribeAll();
 
     // Create or reuse a conversation with the real agent
@@ -293,6 +295,10 @@ export default function Chat() {
     if (activeAgents.find(a => a.id === agent.id)) return;
     const newActive = [...activeAgents, agent];
     setActiveAgents(newActive);
+    // Switch to group chat mode when adding agents
+    if (newActive.length > 1) {
+      setIsGroupChat(true);
+    }
 
     // Create a new conversation for this agent too
     const convo = await base44.agents.createConversation({
@@ -415,17 +421,21 @@ export default function Chat() {
         ) : (
           <>
             {/* Header */}
-            <div className="h-14 border-b border-border flex items-center gap-3 px-4 bg-card/30 shrink-0">
+            <div className="h-14 border-b border-border flex items-center gap-3 px-4 bg-gradient-to-r from-card/30 to-transparent shrink-0">
+              {isGroupChat && activeAgents.length > 1 && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-primary/10 rounded-full shrink-0">
+                  <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                  <span className="text-xs font-semibold text-primary">שיחת ועידה</span>
+                </div>
+              )}
               <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto">
                 {activeAgents.map(a => (
                   <div key={a.id} className="flex items-center gap-1.5 bg-secondary/60 rounded-full pl-1 pr-2 py-1 shrink-0">
                     <AgentAvatar agent={a} size="sm" />
                     <span className="text-xs font-medium text-foreground">{a.title_he || a.title}</span>
-                    {activeAgents.length > 1 && (
-                      <button onClick={() => removeAgent(a.id)} className="text-muted-foreground hover:text-foreground ml-0.5">
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+                    <button onClick={() => removeAgent(a.id)} className="text-muted-foreground hover:text-foreground ml-0.5" title="הוסר מהשיחה">
+                      <X className="w-3 h-3" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -445,7 +455,7 @@ export default function Chat() {
                     <AgentAvatar agent={selectedAgent} size="xl" />
                     <p className="text-lg font-bold text-foreground">{selectedAgent.title}</p>
                     <p className="text-sm text-muted-foreground max-w-xs">{selectedAgent.responsibilities}</p>
-                    <p className="text-xs text-muted-foreground/50 mt-2">השתמש ב-@ להוספת סוכנים נוספים</p>
+                    <p className="text-xs text-muted-foreground/50 mt-2">השתמש ב-@ להוספת סוכנים נוספים לשיחת ועידה</p>
                   </div>
                 )}
                 {messages.map(msg => (
