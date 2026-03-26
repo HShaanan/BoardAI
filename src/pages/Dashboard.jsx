@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowUp, Loader2, Bot, Plus, MessageSquare, Trash2, X, AtSign, Check, Sparkles, Users } from "lucide-react";
+import { ArrowUp, Loader2, Bot, Plus, MessageSquare, Trash2, X, AtSign, Check, Sparkles, Users, ListTodo } from "lucide-react";
+import TaskPanel from "../components/chat/TaskPanel";
 import ReactMarkdown from "react-markdown";
 import AgentAvatar from "../components/shared/AgentAvatar";
 
@@ -109,11 +110,18 @@ export default function Dashboard() {
   const [mentionQuery, setMentionQuery] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecs, setLoadingRecs] = useState(false);
+  const [showTaskPanel, setShowTaskPanel] = useState(false);
+  const [tasks, setTasks] = useState([]);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const unsubsRef = useRef({});
 
+  const refreshTasks = () => {
+    base44.entities.Task.list("-created_date", 50).then(setTasks);
+  };
+
   useEffect(() => {
+    refreshTasks();
     base44.entities.Agent.list().then(a => {
       const active = a.filter(ag => ag.is_active);
       setAllAgents(active);
@@ -349,6 +357,8 @@ export default function Dashboard() {
     }
 
     setLoading(false);
+    // Auto-refresh tasks after AI responds
+    setTimeout(refreshTasks, 2000);
   };
 
   const handleKeyDown = (e) => {
@@ -428,6 +438,16 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Task Panel */}
+      {showTaskPanel && (
+        <TaskPanel
+          tasks={tasks}
+          agents={allAgents}
+          onRefresh={refreshTasks}
+          onClose={() => setShowTaskPanel(false)}
+        />
+      )}
+
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {loadingConvo ? (
@@ -437,6 +457,13 @@ export default function Dashboard() {
         ) : !showMessages ? (
           /* Empty state */
           <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
+            <div className="flex items-center gap-2 absolute top-3 left-3">
+              <button onClick={() => { setShowTaskPanel(p => !p); refreshTasks(); }}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${showTaskPanel ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                <ListTodo className="w-3.5 h-3.5" />
+                משימות
+              </button>
+            </div>
             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
               <Bot className="w-6 h-6 text-primary" />
             </div>
@@ -502,24 +529,33 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Active agents header */}
-            {activeAgents.length > 0 && (
-              <div className="border-b border-border px-4 py-2 flex items-center gap-2 flex-wrap bg-card/50">
-                <div className="flex items-center gap-1.5 bg-primary/10 rounded-full px-2 py-1">
-                  <Bot className="w-3.5 h-3.5 text-primary" />
-                  <span className="text-xs font-medium text-primary">Boss AI</span>
-                </div>
-                {activeAgents.map(a => (
-                  <div key={a.id} className="flex items-center gap-1.5 bg-secondary rounded-full px-2 py-1">
-                    <AgentAvatar agent={a} size="sm" />
-                    <span className="text-xs font-medium">{a.title_he || a.title}</span>
-                    <button onClick={() => toggleAgent(a)} className="text-muted-foreground hover:text-foreground ml-0.5">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+            {/* Header bar */}
+            <div className="border-b border-border px-4 py-2 flex items-center justify-between bg-card/50">
+              <div className="flex items-center gap-2 flex-wrap">
+                {activeAgents.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-1.5 bg-primary/10 rounded-full px-2 py-1">
+                      <Bot className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-xs font-medium text-primary">Boss AI</span>
+                    </div>
+                    {activeAgents.map(a => (
+                      <div key={a.id} className="flex items-center gap-1.5 bg-secondary rounded-full px-2 py-1">
+                        <span className="text-xs font-medium">{a.title_he || a.title}</span>
+                        <button onClick={() => toggleAgent(a)} className="text-muted-foreground hover:text-foreground">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
-            )}
+              <button onClick={() => { setShowTaskPanel(p => !p); refreshTasks(); }}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${showTaskPanel ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
+                <ListTodo className="w-3.5 h-3.5" />
+                משימות {tasks.filter(t => t.status !== "done").length > 0 && `(${tasks.filter(t => t.status !== "done").length})`}
+              </button>
+            </div>
+
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto">
