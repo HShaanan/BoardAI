@@ -1,10 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Network, MessageSquare, Brain, Heart,
-  FolderKanban, Archive, BookOpen, Settings, Zap, ChevronLeft, ChevronRight, Sparkles, CheckSquare, History, UserCog
+  FolderKanban, Archive, BookOpen, Settings, Zap, ChevronLeft, ChevronRight, CheckSquare, History, UserCog
 } from "lucide-react";
 import { useState } from "react";
 import NotificationBell from "../notifications/NotificationBell";
+import CompanySwitcher from "./CompanySwitcher";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -13,12 +14,11 @@ const NAV_ITEMS = [
   { path: "/chat", icon: MessageSquare, label_he: "שיחות" },
   { path: "/directives", icon: Zap, label_he: "הנחיות" },
   { path: "/projects", icon: FolderKanban, label_he: "פרויקטים" },
-  { path: "/brain", icon: Brain, label_he: "המוח" },
-  { path: "/core", icon: Heart, label_he: "הליבה" },
-  { path: "/outputs", icon: Archive, label_he: "תוצרים" },
-  { path: "/memory", icon: BookOpen, label_he: "זיכרון" },
   { path: "/tasks", icon: CheckSquare, label_he: "משימות" },
-  { path: "/chat-history", icon: History, label_he: "היסטוריה" },
+  { path: "/outputs", icon: Archive, label_he: "תוצרים" },
+  { path: "/brain", icon: Brain, label_he: "המוח" },
+  { path: "/memory", icon: BookOpen, label_he: "זיכרון" },
+  { path: "/core", icon: Heart, label_he: "ליבת החברה" },
   { path: "/my-agents", icon: UserCog, label_he: "סוכנים שלי" },
   { path: "/settings", icon: Settings, label_he: "הגדרות" },
 ];
@@ -37,14 +37,17 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="p-4 flex items-center gap-3 border-b border-sidebar-border min-h-[64px]">
         <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">MC</span>
+          <span className="text-primary-foreground font-bold text-sm">AI</span>
         </div>
         {!collapsed && (
           <span className="font-bold text-foreground text-lg tracking-tight whitespace-nowrap">
-            החברה שלי
+            Boss AI
           </span>
         )}
       </div>
+
+      {/* Company Switcher */}
+      <CompanySwitcher collapsed={collapsed} />
 
       {/* Nav */}
       <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
