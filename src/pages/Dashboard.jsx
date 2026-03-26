@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowUp, Loader2, Bot, Plus, MessageSquare, Trash2, X, AtSign, Check } from "lucide-react";
+import { ArrowUp, Loader2, Bot, Plus, MessageSquare, Trash2, X, AtSign, Check, Sparkles, Users } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import AgentAvatar from "../components/shared/AgentAvatar";
 
@@ -14,32 +14,73 @@ function saveStoredConvos(convos) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(convos));
 }
 
-// Agent mention popup with multi-select
-function AgentMentionPopup({ agents, activeAgentKeys, query, onToggle, onClose }) {
+// Agent mention popup with AI recommendations
+function AgentMentionPopup({ agents, activeAgentKeys, query, onToggle, onClose, recommendations, loadingRecs, onAddAll }) {
   const filtered = agents.filter(a =>
     a.title.toLowerCase().includes(query.toLowerCase()) ||
     (a.title_he || "").includes(query)
   );
 
-  if (filtered.length === 0) return null;
+  const recommended = agents.filter(a => recommendations.includes(a.role_key));
+  const others = filtered.filter(a => !recommendations.includes(a.role_key));
 
   return (
     <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-2xl shadow-xl overflow-hidden z-50">
       <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">בחר סוכנים להוספה לשיחה</p>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-          <X className="w-3.5 h-3.5" />
-        </button>
+        <p className="text-xs text-muted-foreground font-medium">הוסף סוכנים לשיחה</p>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
       </div>
-      <div className="max-h-64 overflow-y-auto">
-        {filtered.map(a => {
+
+      {/* Recommendations section */}
+      {(loadingRecs || recommended.length > 0) && (
+        <div className="border-b border-border">
+          <div className="px-3 py-1.5 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-xs font-semibold text-amber-600">מומלצים למשימה</span>
+            </div>
+            {recommended.length > 1 && (
+              <button
+                onClick={() => onAddAll(recommended)}
+                className="flex items-center gap-1 text-xs text-primary hover:underline font-medium"
+              >
+                <Users className="w-3 h-3" />
+                הוסף הכל
+              </button>
+            )}
+          </div>
+          {loadingRecs ? (
+            <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Boss AI מנתח את השיחה...
+            </div>
+          ) : (
+            recommended.map(a => {
+              const isActive = activeAgentKeys.includes(a.role_key);
+              return (
+                <button key={a.id} onClick={() => onToggle(a)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-amber-50/30 transition-colors text-right ${isActive ? "opacity-50" : ""}`}>
+                  <AgentAvatar agent={a} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{a.title_he || a.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{a.department}</p>
+                  </div>
+                  {isActive ? <Check className="w-4 h-4 text-primary shrink-0" /> : <Plus className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* All agents */}
+      {query === "" && <p className="text-[10px] font-semibold text-muted-foreground uppercase px-3 pt-2 pb-1">כל הסוכנים</p>}
+      <div className="max-h-52 overflow-y-auto">
+        {(query === "" ? others : filtered).map(a => {
           const isActive = activeAgentKeys.includes(a.role_key);
           return (
-            <button
-              key={a.id}
-              onClick={() => onToggle(a)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-right ${isActive ? "bg-secondary/60" : ""}`}
-            >
+            <button key={a.id} onClick={() => onToggle(a)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-right ${isActive ? "bg-secondary/60" : ""}`}>
               <AgentAvatar agent={a} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">{a.title_he || a.title}</p>
@@ -66,6 +107,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [loadingConvo, setLoadingConvo] = useState(false);
   const [mentionQuery, setMentionQuery] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const unsubsRef = useRef({});
@@ -231,12 +274,30 @@ export default function Dashboard() {
     textareaRef.current?.focus();
   };
 
+  const fetchRecommendations = async () => {
+    if (messages.length === 0 && !input.trim()) return;
+    setLoadingRecs(true);
+    setRecommendations([]);
+    const context = messages.slice(-6).map(m => `${m.role === 'user' ? 'משתמש' : 'סוכן'}: ${m.content}`).join('\n') || input;
+    const agentsList = allAgents.map(a => `${a.role_key}: ${a.title_he || a.title} (${a.department})`).join('\n');
+    const res = await base44.integrations.Core.InvokeLLM({
+      prompt: `בהתבסס על השיחה הבאה, בחר 3-4 סוכנים הרלוונטיים ביותר מהרשימה.\n\nשיחה:\n${context}\n\nרשימת סוכנים:\n${agentsList}\n\nהחזר JSON עם מפתח role_keys שהוא מערך של role_key strings בלבד.`,
+      response_json_schema: { type: 'object', properties: { role_keys: { type: 'array', items: { type: 'string' } } } }
+    });
+    setRecommendations(res?.role_keys || []);
+    setLoadingRecs(false);
+  };
+
   const handleInputChange = (e) => {
     const val = e.target.value;
     setInput(val);
     const match = val.match(/@(\S*)$/);
-    if (match) setMentionQuery(match[1]);
-    else setMentionQuery(null);
+    if (match) {
+      setMentionQuery(match[1]);
+      if (mentionQuery === null) fetchRecommendations(); // first open
+    } else {
+      setMentionQuery(null);
+    }
   };
 
   const handleSend = async () => {
@@ -297,6 +358,16 @@ export default function Dashboard() {
       handleSend();
     }
     if (e.key === "Escape") setMentionQuery(null);
+  };
+
+  const handleAddAllRecommended = async (agents) => {
+    for (const agent of agents) {
+      if (!activeAgents.find(a => a.role_key === agent.role_key)) {
+        await toggleAgent(agent);
+      }
+    }
+    setMentionQuery(null);
+    setInput(prev => prev.replace(/[@]\S*$/, ''));
   };
 
   const hasBossConvo = !!convoObjects[BOSS_AGENT];
@@ -393,6 +464,9 @@ export default function Dashboard() {
                     query={mentionQuery}
                     onToggle={toggleAgent}
                     onClose={() => setMentionQuery(null)}
+                    recommendations={recommendations}
+                    loadingRecs={loadingRecs}
+                    onAddAll={handleAddAllRecommended}
                   />
                 )}
                 <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
@@ -511,9 +585,12 @@ export default function Dashboard() {
                       query={mentionQuery}
                       onToggle={toggleAgent}
                       onClose={() => setMentionQuery(null)}
+                      recommendations={recommendations}
+                      loadingRecs={loadingRecs}
+                      onAddAll={handleAddAllRecommended}
                     />
-                  )}
-                  <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+                    )}
+                    <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
                     <textarea
                       ref={textareaRef}
                       value={input}
