@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Settings, Users, Loader2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Settings, Users, Loader2, ToggleLeft, ToggleRight, Plug } from "lucide-react";
+import ConnectorsPanel from "../components/settings/ConnectorsPanel";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import PageHeader from "../components/shared/PageHeader";
@@ -35,6 +36,15 @@ export default function SettingsPage() {
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader title="Settings" subtitle="Configure your company and agents" />
+
+      {/* Integrations */}
+      <div className="bg-card rounded-xl border border-border p-6 mb-6">
+        <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Plug className="w-4 h-4 text-primary" /> חיבורים חיצוניים
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">חבר את הכלים החיצוניים שלך כדי שהסוכנים יוכלו לפעול בשמך</p>
+        <ConnectorsPanel />
+      </div>
 
       {/* Agent Management */}
       <div className="bg-card rounded-xl border border-border p-6">
