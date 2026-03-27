@@ -65,15 +65,19 @@ export default function NotificationBell({ collapsed }) {
   };
 
   const load = async () => {
-    const [directives, outputs] = await Promise.all([
-      base44.entities.Directive.filter({ status: "issued" }),
-      base44.entities.Output.list("-created_date", 10),
-    ]);
-    const items = buildNotifications(directives, outputs);
-    const newItems = items.filter(i => !prevIds.current.has(i.id) && !dismissed.has(i.id));
-    newItems.forEach(n => { if (prevIds.current.size > 0) addToast(n); });
-    items.forEach(i => prevIds.current.add(i.id));
-    setNotifications(items.filter(i => !dismissed.has(i.id)));
+    try {
+      const [directives, outputs] = await Promise.all([
+        base44.entities.Directive.filter({ status: "issued" }),
+        base44.entities.Output.list("-created_date", 10),
+      ]);
+      const items = buildNotifications(directives, outputs);
+      const newItems = items.filter(i => !prevIds.current.has(i.id) && !dismissed.has(i.id));
+      newItems.forEach(n => { if (prevIds.current.size > 0) addToast(n); });
+      items.forEach(i => prevIds.current.add(i.id));
+      setNotifications(items.filter(i => !dismissed.has(i.id)));
+    } catch (e) {
+      console.warn("NotificationBell: failed to load", e.message);
+    }
   };
 
   useEffect(() => {
