@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { GitCommit, Star, GitFork, AlertCircle, Loader2, Github, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { GitCommit, Star, GitFork, AlertCircle, Loader2, Github, ExternalLink, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -59,7 +59,19 @@ export default function GitHubActivityWidget() {
           {data && <span className="text-xs text-muted-foreground">— {data.repo.name}</span>}
           {lastSync && <span className="text-[10px] text-muted-foreground">· sync {timeAgo(lastSync.toISOString())}</span>}
         </div>
-        {expanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+          {data && (
+            <button
+              onClick={() => fetchActivity()}
+              disabled={loading}
+              className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+              title="Sync now"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+          {expanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+        </div>
       </div>
 
       {expanded && (
