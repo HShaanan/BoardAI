@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { GitCommit, Star, GitFork, AlertCircle, Loader2, Github, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -12,14 +12,18 @@ function timeAgo(dateStr) {
 }
 
 export default function GitHubActivityWidget() {
-  const [repoInput, setRepoInput] = useState("");
+  const [repoInput, setRepoInput] = useState(() => localStorage.getItem("gh_widget_repo") || "");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(true);
+  const [lastSync, setLastSync] = useState(null);
+  const intervalRef = useRef(null);
 
   const fetchActivity = async (repoStr) => {
-    const parts = (repoStr || repoInput).trim().replace("https://github.com/", "").split("/");
+    const input = (repoStr || repoInput).trim();
+    if (!input) return;
+    const parts = input.replace("https://github.com/", "").split("/");
     if (parts.length < 2) { setError("Format: owner/repo"); return; }
     const [owner, repo] = parts;
     setLoading(true);
@@ -27,8 +31,20 @@ export default function GitHubActivityWidget() {
     const res = await base44.functions.invoke("getGithubActivity", { owner, repo });
     if (res.data?.error) { setError(res.data.error); setLoading(false); return; }
     setData(res.data);
+    setLastSync(new Date());
+    localStorage.setItem("gh_widget_repo", input);
     setLoading(false);
   };
+
+  // Auto-refresh every 60 seconds if repo is set
+  useEffect(() => {
+    if (repoInput.trim()) fetchActivity(repoInput);
+    intervalRef.current = setInterval(() => {
+      const saved = localStorage.getItem("gh_widget_repo");
+      if (saved) fetchActivity(saved);
+    }, 60000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
 
   return (
     <div className="border border-border rounded-xl bg-card overflow-hidden">
@@ -41,6 +57,7 @@ export default function GitHubActivityWidget() {
           <Github className="w-4 h-4 text-foreground" />
           <span className="text-sm font-semibold text-foreground">GitHub Activity</span>
           {data && <span className="text-xs text-muted-foreground">— {data.repo.name}</span>}
+          {lastSync && <span className="text-[10px] text-muted-foreground">· sync {timeAgo(lastSync.toISOString())}</span>}
         </div>
         {expanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
       </div>
