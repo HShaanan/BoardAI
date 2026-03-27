@@ -1,666 +1,722 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowUp, Loader2, Bot, Plus, MessageSquare, Trash2, X, AtSign, Check, Sparkles, Users, ListTodo } from "lucide-react";
-import TaskPanel from "../components/chat/TaskPanel";
+import {
+  ArrowUp, Loader2, Plus, MessageSquare, Trash2, X,
+  Users, User, ChevronLeft, ChevronRight, Zap, PanelLeftClose, PanelLeftOpen
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import AgentAvatar from "../components/shared/AgentAvatar";
+import FeedbackButtons from "../components/shared/FeedbackButtons";
 
-const BOSS_AGENT = "boss_ai";
-const STORAGE_KEY = "boss_ai_conversations";
+const STORAGE_KEY = "boardai_convos_v3";
 
-function loadStoredConvos() {
+function loadConvos() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
 }
-function saveStoredConvos(convos) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(convos));
+function saveConvos(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
-// Agent mention popup with AI recommendations
-function AgentMentionPopup({ agents, activeAgentKeys, query, onToggle, onClose, recommendations, loadingRecs, onAddAll }) {
-  const filtered = agents.filter(a =>
-    a.title.toLowerCase().includes(query.toLowerCase()) ||
-    (a.title_he || "").includes(query)
-  );
-
-  const recommended = agents.filter(a => recommendations.includes(a.role_key));
-  const others = filtered.filter(a => !recommendations.includes(a.role_key));
-
+// ── Typing dots ──────────────────────────────────────────
+function TypingBubble({ agent }) {
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-2xl shadow-xl overflow-hidden z-50">
-      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <p className="text-xs text-muted-foreground font-medium">הוסף סוכנים לשיחה</p>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+    <div className="flex gap-3 items-start mb-5">
+      <div className="shrink-0 mt-0.5">
+        {agent
+          ? <AgentAvatar agent={agent} size="sm" />
+          : <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-base">🤖</div>
+        }
       </div>
-
-      {/* Recommendations section */}
-      {(loadingRecs || recommended.length > 0) && (
-        <div className="border-b border-border">
-          <div className="px-3 py-1.5 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span className="text-xs font-semibold text-amber-600">מומלצים למשימה</span>
-            </div>
-            {recommended.length > 1 && (
-              <button
-                onClick={() => onAddAll(recommended)}
-                className="flex items-center gap-1 text-xs text-primary hover:underline font-medium"
-              >
-                <Users className="w-3 h-3" />
-                הוסף הכל
-              </button>
-            )}
-          </div>
-          {loadingRecs ? (
-            <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Boss AI מנתח את השיחה...
-            </div>
-          ) : (
-            recommended.map(a => {
-              const isActive = activeAgentKeys.includes(a.role_key);
-              return (
-                <button key={a.id} onClick={() => onToggle(a)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-amber-50/30 transition-colors text-right ${isActive ? "opacity-50" : ""}`}>
-                  <AgentAvatar agent={a} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{a.title_he || a.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{a.department}</p>
-                  </div>
-                  {isActive ? <Check className="w-4 h-4 text-primary shrink-0" /> : <Plus className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {/* All agents */}
-      {query === "" && <p className="text-[10px] font-semibold text-muted-foreground uppercase px-3 pt-2 pb-1">כל הסוכנים</p>}
-      <div className="max-h-52 overflow-y-auto">
-        {(query === "" ? others : filtered).map(a => {
-          const isActive = activeAgentKeys.includes(a.role_key);
-          return (
-            <button key={a.id} onClick={() => onToggle(a)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-right ${isActive ? "bg-secondary/60" : ""}`}>
-              <AgentAvatar agent={a} size="sm" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{a.title_he || a.title}</p>
-                <p className="text-xs text-muted-foreground truncate">{a.department}</p>
-              </div>
-              {isActive && <Check className="w-4 h-4 text-primary shrink-0" />}
-            </button>
-          );
-        })}
+      <div className="bg-card border border-border rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
+        {[0, 150, 300].map(delay => (
+          <span key={delay} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce"
+            style={{ animationDelay: `${delay}ms` }} />
+        ))}
       </div>
     </div>
   );
 }
 
+// ── Single message bubble ────────────────────────────────
+function MessageBubble({ msg, agentMap }) {
+  const isUser = msg.role === "user";
+  const agent = msg.agentKey ? agentMap[msg.agentKey] : null;
+
+  if (isUser) {
+    return (
+      <div className="flex justify-end mb-5">
+        <div className="max-w-[72%] bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+          {msg.content}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-3 items-start mb-5 group">
+      <div className="shrink-0 mt-0.5">
+        {agent
+          ? <AgentAvatar agent={agent} size="sm" />
+          : <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-base">🤖</div>
+        }
+      </div>
+      <div className="flex-1 min-w-0 max-w-[82%]">
+        {agent && (
+          <p className="text-xs font-semibold mb-1.5" style={{ color: agent.color || "hsl(var(--muted-foreground))" }}>
+            {agent.title_he || agent.title}
+            {agent.title && agent.title_he && agent.title !== agent.title_he && (
+              <span className="font-normal opacity-50 ml-1">· {agent.title}</span>
+            )}
+          </p>
+        )}
+        <div className="prose prose-sm max-w-none text-foreground/90 leading-relaxed">
+          <ReactMarkdown>{msg.content}</ReactMarkdown>
+        </div>
+        <FeedbackButtons message={msg} agentRoleKey={msg.agentKey} agentTitle={agent?.title} />
+      </div>
+    </div>
+  );
+}
+
+// ── New Chat Modal ───────────────────────────────────────
+function NewChatModal({ agents, onStart, onClose }) {
+  const [step, setStep] = useState("type"); // "type" | "agent" | "board"
+  const [selected, setSelected] = useState([]);
+
+  const cSuiteKeys = ["ceo","cfo","cto","cmo","coo","cpo","cro","chro","boss_ai"];
+  const cSuite = agents.filter(a => cSuiteKeys.includes(a.role_key));
+
+  const toggle = (key) =>
+    setSelected(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+
+  const startBoard = () => {
+    const picked = agents.filter(a => selected.includes(a.role_key));
+    if (picked.length > 0) onStart({ type: "board", agents: picked });
+  };
+
+  // Pre-select C-suite when entering board step
+  const enterBoard = () => {
+    setSelected(cSuite.map(a => a.role_key));
+    setStep("board");
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-2">
+            {step !== "type" && (
+              <button onClick={() => setStep("type")} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-secondary transition-colors">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
+            <h2 className="font-semibold text-foreground">
+              {step === "type" ? "שיחה חדשה" : step === "agent" ? "בחר סוכן" : "ישיבת דירקטוריון"}
+            </h2>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-secondary transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5">
+          {/* Step 1: pick type */}
+          {step === "type" && (
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setStep("agent")}
+                className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all group text-center">
+                <div className="w-12 h-12 rounded-2xl bg-secondary group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                  <User className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground text-sm">אחד על אחד</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">שיחה עם סוכן ספציפי</p>
+                </div>
+              </button>
+              <button onClick={enterBoard}
+                className="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all group text-center">
+                <div className="w-12 h-12 rounded-2xl bg-secondary group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                  <Users className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground text-sm">ישיבת דירקטוריון</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">כל הצוות המנהל</p>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* Step 2a: pick single agent */}
+          {step === "agent" && (
+            <div className="grid grid-cols-3 gap-2 max-h-80 overflow-y-auto">
+              {agents.map(a => (
+                <button key={a.id} onClick={() => onStart({ type: "single", agents: [a] })}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-primary hover:bg-primary/5 transition-all">
+                  <AgentAvatar agent={a} size="md" />
+                  <p className="text-xs font-medium text-center leading-tight line-clamp-2">
+                    {a.title_he || a.title}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Step 2b: board meeting agent selection */}
+          {step === "board" && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm text-muted-foreground">{selected.length} סוכנים נבחרו</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setSelected(cSuite.map(a => a.role_key))}
+                    className="text-xs text-primary hover:underline">C-Suite</button>
+                  <button onClick={() => setSelected(agents.map(a => a.role_key))}
+                    className="text-xs text-primary hover:underline">הכל</button>
+                  <button onClick={() => setSelected([])}
+                    className="text-xs text-muted-foreground hover:underline">נקה</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto mb-4">
+                {agents.map(a => {
+                  const isOn = selected.includes(a.role_key);
+                  return (
+                    <button key={a.id} onClick={() => toggle(a.role_key)}
+                      className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                        isOn ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"
+                      }`}>
+                      <AgentAvatar agent={a} size="sm" />
+                      <p className="text-xs font-medium text-center leading-tight line-clamp-2">
+                        {a.title_he || a.title}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={startBoard} disabled={selected.length === 0}
+                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm disabled:opacity-40 hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                <Zap className="w-4 h-4" />
+                התחל ישיבה עם {selected.length} סוכנים
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Conversation list item ────────────────────────────────
+function ConvoItem({ convo, active, onClick, onDelete }) {
+  return (
+    <button onClick={onClick}
+      className={`w-full group flex items-center gap-2 px-3 py-2 rounded-lg text-right text-sm transition-colors ${
+        active ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+      }`}>
+      <span className="text-sm shrink-0">{convo.type === "board" ? "👥" : "💬"}</span>
+      <span className="flex-1 truncate text-xs">{convo.title}</span>
+      <button
+        onClick={e => onDelete(convo.id, e)}
+        className="opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </button>
+  );
+}
+
+// ── Main component ───────────────────────────────────────
 export default function Dashboard() {
-  const [storedConvos, setStoredConvos] = useState(() => loadStoredConvos());
-  const [activeConvoId, setActiveConvoId] = useState(null);
-  const [convoObjects, setConvoObjects] = useState({}); // agentKey → convo object
-  const [messages, setMessages] = useState([]);
-  const [activeAgents, setActiveAgents] = useState([]); // extra agents besides boss_ai
+  const [convos, setConvos] = useState(() => loadConvos());
+  const [activeMeta, setActiveMeta] = useState(null);
+  const [convoObjects, setConvoObjects] = useState({}); // roleKey → base44 convo
+  const [displayMsgs, setDisplayMsgs] = useState([]); // what we show in UI
   const [allAgents, setAllAgents] = useState([]);
-  const [agentMap, setAgentMap] = useState({}); // role_key → agent
+  const [agentMap, setAgentMap] = useState({});
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingConvo, setLoadingConvo] = useState(false);
-  const [mentionQuery, setMentionQuery] = useState(null);
-  const [recommendations, setRecommendations] = useState([]);
-  const [loadingRecs, setLoadingRecs] = useState(false);
-  const [showTaskPanel, setShowTaskPanel] = useState(false);
-  const [tasks, setTasks] = useState([]);
+  const [sending, setSending] = useState(false);
+  const [typingKeys, setTypingKeys] = useState(new Set());
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
+
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const unsubsRef = useRef({});
+  // For board meetings: context from previous round
+  const boardCtxRef = useRef("");
+  // Track expected assistant message counts per agent (to detect new responses)
+  const expectedCountRef = useRef({});
 
-  const refreshTasks = () => {
-    base44.entities.Task.list("-created_date", 50).then(setTasks);
-  };
-
+  // Load agents on mount
   useEffect(() => {
-    refreshTasks();
-    base44.entities.Agent.list().then(a => {
-      const active = a.filter(ag => ag.is_active);
+    base44.entities.Agent.list().then(list => {
+      const active = list.filter(a => a.is_active);
       setAllAgents(active);
       const map = {};
-      active.forEach(ag => { map[ag.role_key] = ag; });
+      active.forEach(a => { map[a.role_key] = a; });
       setAgentMap(map);
     });
-    return () => { Object.values(unsubsRef.current).forEach(fn => fn()); };
+    return () => unsubAll();
   }, []);
 
+  // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [displayMsgs, typingKeys]);
 
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + "px";
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 200) + "px";
     }
   }, [input]);
 
-  const subscribeAgent = (agentKey, convoId) => {
-    if (unsubsRef.current[agentKey]) unsubsRef.current[agentKey]();
-    const unsub = base44.agents.subscribeToConversation(convoId, (data) => {
-      // Merge all messages from all active convos
-      setConvoObjects(prev => {
-        const updated = { ...prev, [agentKey]: data };
-        rebuildMessages(updated);
-        return updated;
-      });
-    });
-    unsubsRef.current[agentKey] = unsub;
+  const unsubAll = () => {
+    Object.values(unsubsRef.current).forEach(fn => fn?.());
+    unsubsRef.current = {};
   };
 
-  const rebuildMessages = (convosMap) => {
-    // Use boss convo as the reference for turn structure
-    const bossConvo = convosMap[BOSS_AGENT];
-    if (!bossConvo?.messages?.length) {
-      setMessages([]);
-      return;
-    }
-
+  // Rebuild displayMsgs from convoObjects
+  // For board: use primaryAgent's user messages + all agents' assistant messages by turn index
+  const rebuildFromConvos = useCallback((convosMap, primaryKey) => {
+    if (!primaryKey || !convosMap[primaryKey]?.messages) return;
+    const primaryMsgs = convosMap[primaryKey].messages;
     const result = [];
-    const bossMessages = bossConvo.messages;
 
-    // Iterate through boss convo messages in order
-    // Odd indices = user, even indices = assistant (or vice versa)
-    // Boss messages alternate: user, assistant, user, assistant...
-    for (let i = 0; i < bossMessages.length; i++) {
-      const m = bossMessages[i];
-      if (m.role === 'user') {
-        // Add user message once
-        result.push({
-          id: `user-turn-${i}`,
-          role: 'user',
-          content: m.content,
-          agentKey: null,
-        });
-      } else if (m.role === 'assistant') {
-        // Add boss AI response
-        result.push({
-          id: `${BOSS_AGENT}-${i}`,
-          role: 'assistant',
-          content: m.content,
-          agentKey: BOSS_AGENT,
-        });
-        // Add other agents' responses at the same turn
+    primaryMsgs.forEach((m, idx) => {
+      if (m.role === "user") {
+        // Strip injected context (everything after "---\n*הקשר") from display
+        const cleanContent = m.content.replace(/\n\n---\n\*הקשר מהסיבוב הקודם:[\s\S]*$/, "");
+        result.push({ id: `u-${idx}`, role: "user", content: cleanContent, agentKey: null });
+      } else if (m.role === "assistant") {
+        // Add primary agent's response
+        result.push({ id: `${primaryKey}-${idx}`, role: "assistant", content: m.content, agentKey: primaryKey });
+        // Add other agents' responses at same turn
         Object.entries(convosMap).forEach(([key, convo]) => {
-          if (key === BOSS_AGENT || !convo?.messages) return;
-          const agentMsg = convo.messages[i];
-          if (agentMsg?.role === 'assistant') {
-            result.push({
-              id: `${key}-${i}`,
-              role: 'assistant',
-              content: agentMsg.content,
-              agentKey: key,
-            });
+          if (key === primaryKey || !convo?.messages) return;
+          const other = convo.messages[idx];
+          if (other?.role === "assistant") {
+            result.push({ id: `${key}-${idx}`, role: "assistant", content: other.content, agentKey: key });
           }
         });
       }
-    }
+    });
 
-    setMessages(result);
-  };
+    setDisplayMsgs(result);
+  }, []);
 
-  const createNewChat = () => {
-    Object.values(unsubsRef.current).forEach(fn => fn());
-    unsubsRef.current = {};
-    setActiveConvoId(null);
-    setConvoObjects({});
-    setMessages([]);
-    setActiveAgents([]);
-    setInput("");
-  };
+  const subscribeAgent = useCallback((roleKey, convoId, primaryKey) => {
+    if (unsubsRef.current[roleKey]) unsubsRef.current[roleKey]();
+    const unsub = base44.agents.subscribeToConversation(convoId, (data) => {
+      setConvoObjects(prev => {
+        const updated = { ...prev, [roleKey]: data };
+        const pk = primaryKey || Object.keys(updated)[0];
+        rebuildFromConvos(updated, pk);
+        return updated;
+      });
 
-  const openConversation = async (meta) => {
-    setLoadingConvo(true);
-    createNewChat();
-    setActiveConvoId(meta.id);
-    const convo = await base44.agents.getConversation(meta.id);
-    const newConvos = { [BOSS_AGENT]: convo };
-
-    // Also load any extra agent convos stored in meta
-    if (meta.agentConvoIds) {
-      for (const [key, id] of Object.entries(meta.agentConvoIds)) {
-        const c = await base44.agents.getConversation(id);
-        newConvos[key] = c;
-        const agent = allAgents.find(a => a.role_key === key);
-        if (agent) setActiveAgents(prev => [...prev.filter(a => a.role_key !== key), agent]);
+      // Detect new assistant message → remove from typingKeys
+      const assistants = (data.messages || []).filter(m => m.role === "assistant");
+      const expected = expectedCountRef.current[roleKey] ?? 0;
+      if (assistants.length > expected) {
+        expectedCountRef.current[roleKey] = assistants.length;
+        setTypingKeys(prev => {
+          const next = new Set(prev);
+          next.delete(roleKey);
+          return next;
+        });
+        // Save last response to board context
+        if (assistants.length > 0) {
+          const agentData = allAgents.find(a => a.role_key === roleKey);
+          const name = agentData?.title_he || agentData?.title || roleKey;
+          const content = assistants[assistants.length - 1].content;
+          boardCtxRef.current = boardCtxRef.current
+            ? `${boardCtxRef.current}\n\n**${name}**: ${content}`
+            : `**${name}**: ${content}`;
+        }
       }
-    }
+    });
+    unsubsRef.current[roleKey] = unsub;
+  }, [allAgents, rebuildFromConvos]);
 
+  // Open an existing conversation
+  const openConvo = async (meta) => {
+    unsubAll();
+    setDisplayMsgs([]);
+    setConvoObjects({});
+    setTypingKeys(new Set());
+    boardCtxRef.current = "";
+    setActiveMeta(meta);
+
+    if (!meta.agentConvoIds || Object.keys(meta.agentConvoIds).length === 0) return;
+
+    const newConvos = {};
+    const primaryKey = meta.primaryKey || Object.keys(meta.agentConvoIds)[0];
+    for (const [key, id] of Object.entries(meta.agentConvoIds)) {
+      const c = await base44.agents.getConversation(id);
+      newConvos[key] = c;
+      subscribeAgent(key, c.id, primaryKey);
+    }
     setConvoObjects(newConvos);
-    rebuildMessages(newConvos);
-    Object.entries(newConvos).forEach(([key, c]) => subscribeAgent(key, c.id));
-    setLoadingConvo(false);
+    rebuildFromConvos(newConvos, primaryKey);
+  };
+
+  // Start a brand-new chat
+  const startNewChat = ({ type, agents }) => {
+    setShowNewChat(false);
+    unsubAll();
+    setDisplayMsgs([]);
+    setConvoObjects({});
+    setTypingKeys(new Set());
+    boardCtxRef.current = "";
+    expectedCountRef.current = {};
+
+    const primaryKey = agents[0].role_key;
+    const title = type === "board"
+      ? `ישיבת דירקטוריון — ${new Date().toLocaleDateString("he-IL")}`
+      : `שיחה עם ${agents[0].title_he || agents[0].title}`;
+
+    setActiveMeta({
+      id: null,
+      title,
+      type,
+      primaryKey,
+      agentKeys: agents.map(a => a.role_key),
+      agentConvoIds: {},
+      createdAt: new Date().toISOString(),
+    });
   };
 
   const deleteConvo = (id, e) => {
     e.stopPropagation();
-    const updated = storedConvos.filter(c => c.id !== id);
-    setStoredConvos(updated);
-    saveStoredConvos(updated);
-    if (activeConvoId === id) createNewChat();
-  };
-
-  const toggleAgent = async (agent) => {
-    const key = agent.role_key;
-    if (activeAgents.find(a => a.role_key === key)) {
-      // Remove agent
-      setActiveAgents(prev => prev.filter(a => a.role_key !== key));
-      if (unsubsRef.current[key]) { unsubsRef.current[key](); delete unsubsRef.current[key]; }
-      setConvoObjects(prev => {
-        const updated = { ...prev };
-        delete updated[key];
-        rebuildMessages(updated);
-        return updated;
-      });
-    } else {
-      // Add agent — create convo immediately if we're in an active chat
-      const newActiveAgents = [...activeAgents, agent];
-      setActiveAgents(newActiveAgents);
-
-      if (convoObjects[BOSS_AGENT]) {
-        // We have an active boss convo — create agent convo now
-        const convo = await base44.agents.createConversation({
-          agent_name: key,
-          metadata: { title: `שיחה עם ${agent.title_he || agent.title}` }
-        });
-        const updated = { ...convoObjects, [key]: convo };
-        setConvoObjects(updated);
-        subscribeAgent(key, convo.id);
-        rebuildMessages(updated);
-      }
-    }
-    setMentionQuery(null);
-    setInput(prev => prev.replace(/[@]\S*$/, ''));
-    textareaRef.current?.focus();
-  };
-
-  const fetchRecommendations = async () => {
-    if (messages.length === 0 && !input.trim()) return;
-    setLoadingRecs(true);
-    setRecommendations([]);
-    const context = messages.slice(-6).map(m => `${m.role === 'user' ? 'משתמש' : 'סוכן'}: ${m.content}`).join('\n') || input;
-    const agentsList = allAgents.map(a => `${a.role_key}: ${a.title_he || a.title} (${a.department})`).join('\n');
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `בהתבסס על השיחה הבאה, בחר 3-4 סוכנים הרלוונטיים ביותר מהרשימה.\n\nשיחה:\n${context}\n\nרשימת סוכנים:\n${agentsList}\n\nהחזר JSON עם מפתח role_keys שהוא מערך של role_key strings בלבד.`,
-      response_json_schema: { type: 'object', properties: { role_keys: { type: 'array', items: { type: 'string' } } } }
-    });
-    setRecommendations(res?.role_keys || []);
-    setLoadingRecs(false);
-  };
-
-  const handleInputChange = (e) => {
-    const val = e.target.value;
-    setInput(val);
-    const match = val.match(/@(\S*)$/);
-    if (match) {
-      setMentionQuery(match[1]);
-      if (mentionQuery === null) fetchRecommendations(); // first open
-    } else {
-      setMentionQuery(null);
+    const updated = convos.filter(c => c.id !== id);
+    setConvos(updated);
+    saveConvos(updated);
+    if (activeMeta?.id === id) {
+      setActiveMeta(null);
+      setDisplayMsgs([]);
+      setConvoObjects({});
+      unsubAll();
     }
   };
 
+  // Send a message
   const handleSend = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || sending || !activeMeta) return;
     const text = input.trim();
     setInput("");
-    setMentionQuery(null);
-    setLoading(true);
+    setSending(true);
 
-    let currentConvoId = activeConvoId;
+    const isBoard = activeMeta.type === "board";
+    const agents = activeMeta.agentKeys.map(k => agentMap[k]).filter(Boolean);
+    const primaryKey = activeMeta.primaryKey || agents[0]?.role_key;
+
     let currentConvos = { ...convoObjects };
+    let currentMeta = { ...activeMeta };
 
-    if (!currentConvoId) {
-      // Create boss_ai convo
-      const bossConvo = await base44.agents.createConversation({
-        agent_name: BOSS_AGENT,
-        metadata: { title: text.slice(0, 50) }
-      });
-      currentConvoId = bossConvo.id;
-      currentConvos[BOSS_AGENT] = bossConvo;
-      subscribeAgent(BOSS_AGENT, bossConvo.id);
-      setActiveConvoId(currentConvoId);
-
-      // Create convos for active agents too
+    // ── Create conversations on first message ──
+    if (Object.keys(currentConvos).length === 0) {
       const agentConvoIds = {};
-      for (const agent of activeAgents) {
+      for (const agent of agents) {
         const c = await base44.agents.createConversation({
           agent_name: agent.role_key,
-          metadata: { title: text.slice(0, 50) }
+          metadata: { title: currentMeta.title },
         });
         currentConvos[agent.role_key] = c;
         agentConvoIds[agent.role_key] = c.id;
-        subscribeAgent(agent.role_key, c.id);
+        subscribeAgent(agent.role_key, c.id, primaryKey);
+        expectedCountRef.current[agent.role_key] = 0;
       }
 
-      const meta = { id: currentConvoId, title: text.slice(0, 50), createdAt: new Date().toISOString(), agentConvoIds };
-      const updated = [meta, ...storedConvos];
-      setStoredConvos(updated);
-      saveStoredConvos(updated);
+      const newMeta = {
+        ...currentMeta,
+        id: currentConvos[primaryKey].id,
+        agentConvoIds,
+      };
+      currentMeta = newMeta;
+      setActiveMeta(newMeta);
+      setConvoObjects(currentConvos);
+
+      const updated = [newMeta, ...convos.filter(c => c.id !== newMeta.id)];
+      setConvos(updated);
+      saveConvos(updated);
     }
 
-    setConvoObjects(currentConvos);
+    // ── Add user message to display immediately ──
+    const userMsgId = `u-local-${Date.now()}`;
+    setDisplayMsgs(prev => [...prev, { id: userMsgId, role: "user", content: text, agentKey: null }]);
 
-    // Send to boss_ai + all active agents
-    const allConvoKeys = [BOSS_AGENT, ...activeAgents.map(a => a.role_key)];
-    for (const key of allConvoKeys) {
-      const convo = currentConvos[key];
-      if (convo) await base44.agents.addMessage(convo, { role: 'user', content: text });
+    // ── Build actual message content ──
+    let msgContent = text;
+    if (isBoard && boardCtxRef.current) {
+      msgContent = `${text}\n\n---\n*הקשר מהסיבוב הקודם:*\n${boardCtxRef.current}`;
     }
 
-    setLoading(false);
-    // Auto-refresh tasks after AI responds
-    setTimeout(refreshTasks, 2000);
+    // Reset board context for new round
+    boardCtxRef.current = "";
+
+    // ── Mark all agents as typing ──
+    const typingSet = new Set(agents.map(a => a.role_key));
+    setTypingKeys(typingSet);
+
+    // ── Update expected assistant counts ──
+    agents.forEach(a => {
+      const convo = currentConvos[a.role_key];
+      const currentCount = (convo?.messages || []).filter(m => m.role === "assistant").length;
+      expectedCountRef.current[a.role_key] = currentCount;
+    });
+
+    // ── Send to all agents in parallel ──
+    await Promise.all(agents.map(agent => {
+      const convo = currentConvos[agent.role_key];
+      if (!convo) return null;
+      return base44.agents.addMessage(convo, { role: "user", content: msgContent });
+    }));
+
+    setSending(false);
   };
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (mentionQuery !== null) return;
       handleSend();
     }
-    if (e.key === "Escape") setMentionQuery(null);
   };
 
-  const handleAddAllRecommended = async (agents) => {
-    for (const agent of agents) {
-      if (!activeAgents.find(a => a.role_key === agent.role_key)) {
-        await toggleAgent(agent);
-      }
-    }
-    setMentionQuery(null);
-    setInput(prev => prev.replace(/[@]\S*$/, ''));
+  // Group convos by date
+  const todayStr = new Date().toDateString();
+  const grouped = {
+    today: convos.filter(c => new Date(c.createdAt).toDateString() === todayStr),
+    older: convos.filter(c => new Date(c.createdAt).toDateString() !== todayStr),
   };
 
-  const hasBossConvo = !!convoObjects[BOSS_AGENT];
-  const showMessages = messages.length > 0 || hasBossConvo;
-
-  const groupedConvos = {
-    today: storedConvos.filter(c => new Date(c.createdAt).toDateString() === new Date().toDateString()),
-    older: storedConvos.filter(c => new Date(c.createdAt).toDateString() !== new Date().toDateString()),
-  };
+  const isBoard = activeMeta?.type === "board";
+  const activeAgents = (activeMeta?.agentKeys || []).map(k => agentMap[k]).filter(Boolean);
+  const primaryAgent = activeAgents.find(a => a.role_key === activeMeta?.primaryKey) || activeAgents[0];
+  const canSend = !!input.trim() && !sending && !!activeMeta;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-64 shrink-0 border-l border-border bg-card flex-col hidden md:flex">
+    <div className="flex h-[calc(100dvh-56px)] md:h-screen bg-background overflow-hidden">
+
+      {/* ── Conversation History Sidebar ── */}
+      <div className={`
+        shrink-0 border-l border-border bg-card flex-col
+        transition-all duration-200 overflow-hidden
+        hidden md:flex
+        ${sidebarOpen ? "w-64" : "w-0"}
+      `}>
         <div className="p-3 border-b border-border">
-          <button
-            onClick={createNewChat}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border hover:bg-secondary text-sm font-medium text-foreground transition-colors"
-          >
+          <button onClick={() => setShowNewChat(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
             <Plus className="w-4 h-4" />
             שיחה חדשה
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-4">
-          {groupedConvos.today.length > 0 && (
+        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+          {convos.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-10">אין שיחות עדיין</p>
+          )}
+          {grouped.today.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase px-2 mb-1">היום</p>
               <div className="space-y-0.5">
-                {groupedConvos.today.map(c => (
-                  <button key={c.id} onClick={() => openConversation(c)}
-                    className={`w-full group flex items-center gap-2 px-3 py-2 rounded-lg text-right text-sm transition-colors ${activeConvoId === c.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}`}>
-                    <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-50" />
-                    <span className="flex-1 truncate">{c.title}</span>
-                    <Trash2 className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity" onClick={(e) => deleteConvo(c.id, e)} />
-                  </button>
+                {grouped.today.map(c => (
+                  <ConvoItem key={c.id} convo={c} active={activeMeta?.id === c.id}
+                    onClick={() => openConvo(c)} onDelete={deleteConvo} />
                 ))}
               </div>
             </div>
           )}
-          {groupedConvos.older.length > 0 && (
+          {grouped.older.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase px-2 mb-1">קודם</p>
               <div className="space-y-0.5">
-                {groupedConvos.older.map(c => (
-                  <button key={c.id} onClick={() => openConversation(c)}
-                    className={`w-full group flex items-center gap-2 px-3 py-2 rounded-lg text-right text-sm transition-colors ${activeConvoId === c.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}`}>
-                    <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-50" />
-                    <span className="flex-1 truncate">{c.title}</span>
-                    <Trash2 className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity" onClick={(e) => deleteConvo(c.id, e)} />
-                  </button>
+                {grouped.older.map(c => (
+                  <ConvoItem key={c.id} convo={c} active={activeMeta?.id === c.id}
+                    onClick={() => openConvo(c)} onDelete={deleteConvo} />
                 ))}
               </div>
             </div>
-          )}
-          {storedConvos.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-8">אין שיחות עדיין</p>
           )}
         </div>
       </div>
 
-      {/* Task Panel */}
-      {showTaskPanel && (
-        <TaskPanel
-          tasks={tasks}
-          agents={allAgents}
-          onRefresh={refreshTasks}
-          onClose={() => setShowTaskPanel(false)}
-        />
-      )}
-
-      {/* Main Area */}
+      {/* ── Main Area ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {loadingConvo ? (
-          <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : !showMessages ? (
-          /* Empty state */
-          <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
-            <div className="flex items-center gap-2 absolute top-3 left-3">
-              <button onClick={() => { setShowTaskPanel(p => !p); refreshTasks(); }}
-                className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${showTaskPanel ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
-                <ListTodo className="w-3.5 h-3.5" />
-                משימות
-              </button>
+        {!activeMeta ? (
+          /* ── Welcome screen ── */
+          <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+            {/* Sidebar toggle on welcome screen */}
+            <button onClick={() => setSidebarOpen(o => !o)}
+              className="absolute top-4 right-4 md:right-auto md:left-[calc(var(--sidebar-width,256px)+16px)] p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hidden md:flex">
+              {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+            </button>
+
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+              <span className="text-3xl">🏛️</span>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-              <Bot className="w-6 h-6 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Boss AI</h1>
-            <p className="text-muted-foreground text-sm mb-8">מנהל הסוכנים שלך — שאל, הנחה, נתח. לחץ @ להוספת סוכנים</p>
-            <div className="w-full max-w-2xl">
-              {activeAgents.length > 0 && (
-                <div className="flex items-center gap-2 mb-3 flex-wrap justify-center">
-                  {activeAgents.map(a => (
-                    <div key={a.id} className="flex items-center gap-1.5 bg-secondary rounded-full px-2 py-1">
-                      <AgentAvatar agent={a} size="sm" />
-                      <span className="text-xs font-medium">{a.title_he || a.title}</span>
-                      <button onClick={() => toggleAgent(a)} className="text-muted-foreground hover:text-foreground ml-0.5">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="relative">
-                {mentionQuery !== null && (
-                  <AgentMentionPopup
-                    agents={allAgents}
-                    activeAgentKeys={activeAgents.map(a => a.role_key)}
-                    query={mentionQuery}
-                    onToggle={toggleAgent}
-                    onClose={() => setMentionQuery(null)}
-                    recommendations={recommendations}
-                    loadingRecs={loadingRecs}
-                    onAddAll={handleAddAllRecommended}
-                  />
-                )}
-                <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                  <textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    placeholder="במה אוכל לעזור? (@ להוספת סוכן)"
-                    rows={3}
-                    className="w-full px-5 pt-4 pb-2 text-sm bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground"
-                    style={{ direction: "rtl" }}
-                  />
-                  <div className="flex items-center justify-between px-4 pb-3">
-                    <button
-                      onClick={() => { setInput(prev => prev + "@"); setMentionQuery(""); textareaRef.current?.focus(); }}
-                      className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
-                      title="הוסף סוכן"
-                    >
-                      <AtSign className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={handleSend}
-                      disabled={!input.trim() || loading}
-                      className="w-8 h-8 rounded-full bg-foreground flex items-center justify-center disabled:opacity-30 hover:opacity-75 transition-opacity"
-                    >
-                      {loading ? <Loader2 className="w-4 h-4 text-background animate-spin" /> : <ArrowUp className="w-4 h-4 text-background" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <h1 className="text-3xl font-bold text-foreground mb-3">BoardAI</h1>
+            <p className="text-muted-foreground max-w-sm mb-8 leading-relaxed">
+              שוחח אחד-על-אחד עם כל סוכן, או כנס לישיבת דירקטוריון עם כל הצוות המנהל שלך
+            </p>
+            <button onClick={() => setShowNewChat(true)}
+              className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors shadow-lg">
+              <Plus className="w-5 h-5" />
+              התחל שיחה חדשה
+            </button>
           </div>
         ) : (
           <>
-            {/* Header bar */}
-            <div className="border-b border-border px-4 py-2 flex items-center justify-between bg-card/50">
-              <div className="flex items-center gap-2 flex-wrap">
-                {activeAgents.length > 0 && (
-                  <>
-                    <div className="flex items-center gap-1.5 bg-primary/10 rounded-full px-2 py-1">
-                      <Bot className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-xs font-medium text-primary">Boss AI</span>
-                    </div>
-                    {activeAgents.map(a => (
-                      <div key={a.id} className="flex items-center gap-1.5 bg-secondary rounded-full px-2 py-1">
-                        <span className="text-xs font-medium">{a.title_he || a.title}</span>
-                        <button onClick={() => toggleAgent(a)} className="text-muted-foreground hover:text-foreground">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-              <button onClick={() => { setShowTaskPanel(p => !p); refreshTasks(); }}
-                className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${showTaskPanel ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
-                <ListTodo className="w-3.5 h-3.5" />
-                משימות {tasks.filter(t => t.status !== "done").length > 0 && `(${tasks.filter(t => t.status !== "done").length})`}
+            {/* ── Chat Header ── */}
+            <div className="h-14 border-b border-border flex items-center gap-3 px-4 shrink-0 bg-card/40">
+              {/* Sidebar toggle */}
+              <button onClick={() => setSidebarOpen(o => !o)}
+                className="hidden md:flex p-1.5 rounded-xl hover:bg-secondary transition-colors text-muted-foreground shrink-0">
+                {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
+
+              {isBoard ? (
+                /* Board meeting header */
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 rounded-full shrink-0">
+                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                    <span className="text-xs font-semibold text-primary">ישיבת דירקטוריון</span>
+                  </div>
+                  <div className="flex items-center gap-1 overflow-hidden">
+                    {activeAgents.slice(0, 7).map(a => (
+                      <AgentAvatar key={a.id} agent={a} size="sm" />
+                    ))}
+                    {activeAgents.length > 7 && (
+                      <div className="w-8 h-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                        +{activeAgents.length - 7}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* 1-on-1 header */
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  {primaryAgent && <AgentAvatar agent={primaryAgent} size="sm" showStatus />}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {primaryAgent?.title_he || primaryAgent?.title}
+                    </p>
+                    {primaryAgent?.title_he && primaryAgent.title !== primaryAgent.title_he && (
+                      <p className="text-[10px] text-muted-foreground truncate">{primaryAgent.title}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
-
-            {/* Messages */}
+            {/* ── Messages ── */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-                {messages.map((msg, i) => {
-                  const agent = msg.agentKey ? agentMap[msg.agentKey] : null;
-                  const isBoss = msg.agentKey === BOSS_AGENT;
-                  return (
-                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start gap-3"}`}>
-                      {msg.role === "assistant" && (
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-1">
-                          {agent && !isBoss ? (
-                            <AgentAvatar agent={agent} size="sm" />
-                          ) : (
-                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
-                              <Bot className="w-3.5 h-3.5 text-primary" />
+              <div className="max-w-2xl mx-auto px-4 py-8">
+
+                {/* Empty state per conversation */}
+                {displayMsgs.length === 0 && typingKeys.size === 0 && (
+                  <div className="flex flex-col items-center gap-4 py-16 text-center">
+                    {isBoard ? (
+                      <>
+                        <div className="flex -space-x-2 rtl:space-x-reverse">
+                          {activeAgents.slice(0, 5).map(a => (
+                            <div key={a.id} className="ring-2 ring-background rounded-full">
+                              <AgentAvatar agent={a} size="md" />
                             </div>
+                          ))}
+                        </div>
+                        <div>
+                          <p className="text-xl font-bold text-foreground">ישיבת דירקטוריון</p>
+                          <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                            {activeAgents.length} סוכנים ישיבו. בסיבובים הבאים — כל סוכן יקבל הקשר מתגובות עמיתיו
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {primaryAgent && <AgentAvatar agent={primaryAgent} size="xl" />}
+                        <div>
+                          <p className="text-xl font-bold text-foreground">
+                            {primaryAgent?.title_he || primaryAgent?.title}
+                          </p>
+                          {primaryAgent?.responsibilities && (
+                            <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+                              {primaryAgent.responsibilities}
+                            </p>
                           )}
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        {msg.role === "assistant" && agent && !isBoss && (
-                          <p className="text-xs font-semibold mb-1 text-muted-foreground">{agent.title_he || agent.title}</p>
-                        )}
-                        <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                          msg.role === "user" ? "bg-secondary text-foreground rounded-bl-sm ml-auto" : "text-foreground"
-                        }`}>
-                          {msg.role === "assistant" ? (
-                            <div className="prose prose-sm max-w-none text-foreground">
-                              <ReactMarkdown>{msg.content}</ReactMarkdown>
-                            </div>
-                          ) : (
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {loading && (
-                  <div className="flex justify-start gap-3">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
-                      <Bot className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      חושב...
-                    </div>
+                      </>
+                    )}
                   </div>
                 )}
+
+                {/* Message list */}
+                {displayMsgs.map(msg => (
+                  <MessageBubble key={msg.id} msg={msg} agentMap={agentMap} />
+                ))}
+
+                {/* Typing indicators */}
+                {Array.from(typingKeys).map(key => (
+                  <TypingBubble key={key} agent={agentMap[key]} />
+                ))}
+
                 <div ref={bottomRef} />
               </div>
             </div>
 
-            {/* Input */}
-            <div className="border-t border-border px-4 py-4">
+            {/* ── Input ── */}
+            <div className="px-4 pb-4 pt-2 shrink-0">
               <div className="max-w-2xl mx-auto">
-                <div className="relative">
-                  {mentionQuery !== null && (
-                    <AgentMentionPopup
-                      agents={allAgents}
-                      activeAgentKeys={activeAgents.map(a => a.role_key)}
-                      query={mentionQuery}
-                      onToggle={toggleAgent}
-                      onClose={() => setMentionQuery(null)}
-                      recommendations={recommendations}
-                      loadingRecs={loadingRecs}
-                      onAddAll={handleAddAllRecommended}
-                    />
-                    )}
-                    <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                    <textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={handleInputChange}
-                      onKeyDown={handleKeyDown}
-                      placeholder="המשך את השיחה... (@ להוספת סוכן)"
-                      rows={1}
-                      className="w-full px-5 pt-3.5 pb-2 text-sm bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground max-h-40"
-                      style={{ direction: "rtl" }}
-                    />
-                    <div className="flex items-center justify-between px-4 pb-3">
-                      <button
-                        onClick={() => { setInput(prev => prev + "@"); setMentionQuery(""); textareaRef.current?.focus(); }}
-                        className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
-                        title="הוסף סוכן"
-                      >
-                        <AtSign className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handleSend}
-                        disabled={!input.trim() || loading}
-                        className="w-8 h-8 rounded-full bg-foreground flex items-center justify-center disabled:opacity-30 hover:opacity-75 transition-opacity"
-                      >
-                        {loading ? <Loader2 className="w-4 h-4 text-background animate-spin" /> : <ArrowUp className="w-4 h-4 text-background" />}
-                      </button>
-                    </div>
+                <div className="relative bg-card border border-border rounded-2xl shadow-lg overflow-hidden focus-within:border-primary/50 transition-colors">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={
+                      isBoard
+                        ? "שאל את הדירקטוריון..."
+                        : `שאל את ${primaryAgent?.title_he || primaryAgent?.title || "הסוכן"}...`
+                    }
+                    disabled={sending}
+                    dir="auto"
+                    rows={1}
+                    className="w-full bg-transparent px-4 pt-3.5 pb-12 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none resize-none leading-relaxed max-h-[200px] text-right"
+                  />
+                  <div className="absolute bottom-3 right-3 left-3 flex items-center justify-between pointer-events-none">
+                    <p className="text-[10px] text-muted-foreground">
+                      Shift+Enter לשורה חדשה
+                    </p>
+                    <button
+                      onClick={handleSend}
+                      disabled={!canSend}
+                      className={`pointer-events-auto w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                        canSend
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "bg-secondary text-muted-foreground cursor-not-allowed"
+                      }`}
+                    >
+                      {sending
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <ArrowUp className="w-4 h-4" />
+                      }
+                    </button>
                   </div>
                 </div>
-                <p className="text-center text-xs text-muted-foreground mt-2">Enter לשליחה · @ להוספת סוכן · Shift+Enter לשורה חדשה</p>
               </div>
             </div>
           </>
         )}
       </div>
+
+      {/* ── New Chat Modal ── */}
+      {showNewChat && (
+        <NewChatModal
+          agents={allAgents}
+          onStart={startNewChat}
+          onClose={() => setShowNewChat(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -10,7 +10,6 @@ import AppLayout from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import OrgChart from './pages/OrgChart';
 import AgentProfile from './pages/AgentProfile';
-import Chat from './pages/Chat';
 import Directives from './pages/Directives';
 import Projects from './pages/Projects';
 import Brain from './pages/Brain';
@@ -18,7 +17,6 @@ import Core from './pages/Core';
 import Outputs from './pages/Outputs';
 import Memory from './pages/Memory.jsx';
 import SettingsPage from './pages/SettingsPage';
-
 import Tasks from './pages/Tasks';
 import ChatHistory from './pages/ChatHistory';
 import MyAgentSettings from './pages/MyAgentSettings';
@@ -52,9 +50,10 @@ const AuthenticatedApp = () => {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/chat" element={<Navigate to="/" replace />} />
+          <Route path="/board-chat" element={<Navigate to="/" replace />} />
           <Route path="/org-chart" element={<OrgChart />} />
           <Route path="/agent/:id" element={<AgentProfile />} />
-          <Route path="/chat" element={<Chat />} />
           <Route path="/directives" element={<Directives />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/brain" element={<Brain />} />
@@ -62,7 +61,6 @@ const AuthenticatedApp = () => {
           <Route path="/outputs" element={<Outputs />} />
           <Route path="/memory" element={<Memory />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/board-chat" element={<Chat />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/chat-history" element={<ChatHistory />} />
           <Route path="/my-agents" element={<MyAgentSettings />} />
