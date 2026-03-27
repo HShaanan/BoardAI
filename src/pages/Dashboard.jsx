@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { ArrowUp, Loader2, Bot, Plus, MessageSquare, Trash2, X, AtSign, Check, Sparkles, Users, ListTodo } from "lucide-react";
 import TaskPanel from "../components/chat/TaskPanel";
-import GitHubActivityWidget from "../components/dashboard/GitHubActivityWidget";
+
 import ReactMarkdown from "react-markdown";
 import AgentAvatar from "../components/shared/AgentAvatar";
 
@@ -439,10 +439,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* GitHub Widget - always visible in sidebar */}
-      <div className="w-72 shrink-0 border-l border-border bg-card hidden lg:flex flex-col gap-3 p-3 overflow-y-auto">
-        <GitHubActivityWidget />
-      </div>
 
       {/* Task Panel */}
       {showTaskPanel && (
